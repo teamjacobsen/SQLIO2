@@ -57,7 +57,7 @@ namespace SQLIO2
 
             {
                 var stack = new StackBuilder(services)
-                    //.Use<SqlServerMiddleware>()
+                    .Use<SqlServerMiddleware>()
                     .Build();
 
                 var protocol = protocolFactory.Create(ProtocolName, stack);

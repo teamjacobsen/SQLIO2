@@ -37,9 +37,9 @@ namespace SQLIO2.Middlewares
                     {
                         cmd.CommandType = CommandType.StoredProcedure;
 
-                        cmd.Parameters.Add("@Local", SqlDbType.NVarChar, 50).Value = packet.Client.Client.LocalEndPoint.ToString();
-                        cmd.Parameters.Add("@Remote", SqlDbType.NVarChar, 50).Value = packet.Client.Client.RemoteEndPoint.ToString();
-                        cmd.Parameters.Add("@Packet", SqlDbType.VarBinary, 2048).Value = packet;
+                        cmd.Parameters.Add("@LocalEndpoint", SqlDbType.NVarChar, 50).Value = packet.Client.Client.LocalEndPoint.ToString();
+                        cmd.Parameters.Add("@RemoteEndpoint", SqlDbType.NVarChar, 50).Value = packet.Client.Client.RemoteEndPoint.ToString();
+                        cmd.Parameters.Add("@Request", SqlDbType.VarBinary, 2048).Value = packet;
                         var replyParameter = cmd.Parameters.Add("@Reply", SqlDbType.VarBinary, 2048);
                         replyParameter.Direction = ParameterDirection.Output;
 
@@ -63,7 +63,7 @@ namespace SQLIO2.Middlewares
                 }
                 finally
                 {
-                    if (wasOpen)
+                    if (!wasOpen)
                     {
                         connection.Close();
                     }
