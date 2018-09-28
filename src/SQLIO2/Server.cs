@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -9,12 +10,18 @@ namespace SQLIO2
     public class Server
     {
         private readonly TcpListener _listener;
+        private readonly Func<TcpClient, Task> _acceptHandler;
+        private readonly ILogger<Server> _logger;
         private CancellationTokenSource _cts;
         private TaskCompletionSource<object> _tcs;
 
-        public Server(IPEndPoint endpoint)
+        public EndPoint LocalEndpoint => _listener.LocalEndpoint;
+
+        public Server(IPEndPoint endpoint, Func<TcpClient, Task> acceptHandler, ILogger<Server> logger)
         {
             _listener = new TcpListener(endpoint);
+            _acceptHandler = acceptHandler;
+            _logger = logger;
         }
 
         public Task StartListeningAsync()
@@ -56,7 +63,9 @@ namespace SQLIO2
                 {
                     var client = await _listener.AcceptTcpClientAsync();
 
-                    _ = Task.Run(() => new Scanner().ProcessAsync(client.Client));
+                    _logger.LogInformation("Accepting client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
+
+                    _ = Task.Run(() => _acceptHandler(client));
                 }
                 catch (Exception) when (_cts.IsCancellationRequested)
                 {

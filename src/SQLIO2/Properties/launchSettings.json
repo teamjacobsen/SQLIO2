@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SQLIO2": {
+      "commandName": "Project",
+      "commandLineArgs": "client -p 1123 -t 10000 40deadbeef0d"
+    }
+  }
+}

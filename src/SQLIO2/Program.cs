@@ -1,38 +1,20 @@
-﻿using System;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading;
+﻿using McMaster.Extensions.CommandLineUtils;
 using System.Threading.Tasks;
 
 namespace SQLIO2
 {
+    [Command]
+    [Subcommand("client", typeof(ClientCommand))]
+    [Subcommand("proxy", typeof(ProxyCommand))]
     class Program
     {
-        static async Task Main(string[] args)
+        static Task<int> Main(string[] args) => CommandLineApplication.ExecuteAsync<Program>(args);
+
+        private int OnExecute(CommandLineApplication app)
         {
-            Console.WriteLine("Hello World!");
+            app.ShowHelp();
 
-            var endpoint = new IPEndPoint(IPAddress.Any, 1234);
-            var server = new Server(endpoint);
-
-            var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            void Shutdown() => tcs.TrySetResult(null);
-
-            AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) => Shutdown();
-            Console.CancelKeyPress += (s, e) => {
-                e.Cancel = true;
-
-                Shutdown();
-            };
-
-            await server.StartListeningAsync();
-
-            await tcs.Task;
-
-            await server.StopListeningAsync();
-
-            Console.WriteLine("Goodbye");
+            return 1;
         }
     }
 }

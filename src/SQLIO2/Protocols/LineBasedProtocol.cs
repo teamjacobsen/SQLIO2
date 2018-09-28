@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Buffers;
 using System.IO.Pipelines;
 using System.Net.Sockets;
@@ -6,18 +8,29 @@ using System.Threading.Tasks;
 
 namespace SQLIO2
 {
-    class Scanner
+    abstract class LineBasedProtocol
     {
-        public Task ProcessAsync(Socket socket)
-        {
-            var pipe = new Pipe();
-            Task writing = FillPipeAsync(socket, pipe.Writer);
-            Task reading = ReadPipeAsync(pipe.Reader);
+        private readonly RequestDelegate _stack;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ILogger _logger;
 
-            return Task.WhenAll(reading, writing);
+        public LineBasedProtocol(RequestDelegate stack, IServiceScopeFactory serviceScopeFactory, ILogger logger)
+        {
+            _stack = stack;
+            _serviceScopeFactory = serviceScopeFactory;
+            _logger = logger;
         }
 
-        async Task FillPipeAsync(Socket socket, PipeWriter writer)
+        public Task ProcessAsync(TcpClient client)
+        {
+            var pipe = new Pipe();
+            var writingTask = FillPipeAsync(client.Client, pipe.Writer);
+            var readingTask = ReadPipeAsync(client, pipe.Reader);
+
+            return Task.WhenAll(readingTask, writingTask);
+        }
+
+        private async Task FillPipeAsync(Socket socket, PipeWriter writer)
         {
             const int minimumBufferSize = 512;
 
@@ -38,9 +51,9 @@ namespace SQLIO2
                     // Tell the PipeWriter how much was read from the Socket
                     writer.Advance(bytesRead);
                 }
-                catch (Exception ex)
+                catch (Exception e)
                 {
-                    //LogError(ex);
+                    _logger.LogError(e, "Unable to receive on socket");
                     break;
                 }
 
@@ -57,24 +70,24 @@ namespace SQLIO2
             writer.Complete();
         }
 
-        async Task ReadPipeAsync(PipeReader reader)
+        private async Task ReadPipeAsync(TcpClient client, PipeReader reader)
         {
             while (true)
             {
                 ReadResult result = await reader.ReadAsync();
 
-                ReadOnlySequence<byte> buffer = result.Buffer;
+                var buffer = result.Buffer;
                 SequencePosition? position = null;
 
                 do
                 {
                     // Look for a EOL in the buffer
-                    position = buffer.PositionOf((byte)'\n');
+                    position = buffer.PositionOf((byte)'\r') ?? buffer.PositionOf((byte)'\n');
 
                     if (position != null)
                     {
                         // Process the line
-                        ProcessLine(buffer.Slice(0, position.Value));
+                        ProcessLine(client, buffer.Slice(0, position.Value));
 
                         // Skip the line + the \n character (basically position)
                         buffer = buffer.Slice(buffer.GetPosition(1, position.Value));
@@ -96,9 +109,28 @@ namespace SQLIO2
             reader.Complete();
         }
 
-        private void ProcessLine(ReadOnlySequence<byte> line)
+        protected abstract void ProcessLine(TcpClient client, ReadOnlySequence<byte> line);
+
+        protected void RunStack(TcpClient client, byte[] data)
         {
-            Console.WriteLine("GOT");
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using (var scope = _serviceScopeFactory.CreateScope())
+                    {
+                        var packet = new Packet(scope.ServiceProvider, client, data);
+
+                        _logger.LogInformation("Handling packet from {RemoteEndpoint}", client.Client.RemoteEndPoint);
+
+                        await _stack(packet);
+                    }
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "Unknown stack error while handling packet from {RemoteEndpoint}", client.Client.RemoteEndPoint);
+                }
+            });
         }
     }
 }
