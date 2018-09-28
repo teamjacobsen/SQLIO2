@@ -1,0 +1,1 @@
+Run `dotnet publish -c Release -r win7-x64` to publish self contained exe.
