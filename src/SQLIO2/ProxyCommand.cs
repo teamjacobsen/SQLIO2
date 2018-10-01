@@ -14,8 +14,8 @@ namespace SQLIO2
     class ProxyCommand
     {
         [Required]
-        [Option("-l|--listen-port")]
-        public int ListenPort { get; set; }
+        [Option("-d|--device-port")]
+        public int DevicePort { get; set; }
 
         [Option("-f|--fanout-port")]
         public int? FanoutPort { get; set; }
@@ -62,7 +62,7 @@ namespace SQLIO2
 
                 var protocol = protocolFactory.Create(ProtocolName, stack);
                 
-                deviceServer = serverFactory.Create(new IPEndPoint(IPAddress.Any, ListenPort), client =>
+                deviceServer = serverFactory.Create(new IPEndPoint(IPAddress.Any, DevicePort), client =>
                 {
                     var proxyService = services.GetRequiredService<ProxyService>();
                     var logger = services.GetRequiredService<ILogger<ProxyCommand>>();
