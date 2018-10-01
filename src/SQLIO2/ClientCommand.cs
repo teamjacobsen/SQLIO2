@@ -14,6 +14,9 @@ namespace SQLIO2
 {
     class ClientCommand
     {
+        [Option("-h|--host", CommandOptionType.SingleValue)]
+        public string Host { get; set; }
+
         [Required]
         [Option("-p|--port", CommandOptionType.SingleValue)]
         public int Port { get; set; }
@@ -32,7 +35,14 @@ namespace SQLIO2
         {
             using (var client = new TcpClient())
             {
-                await client.ConnectAsync(IPAddress.Loopback, Port);
+                if (Host != null)
+                {
+                    await client.ConnectAsync(Host, Port);
+                }
+                else
+                {
+                    await client.ConnectAsync(IPAddress.Loopback, Port);
+                }
 
                 var stream = client.GetStream();
                 var data = ToByteArray(DataHex);

@@ -14,4 +14,4 @@ sqlio2 proxy -l PLCPORT -f FANPORT
 Send to all the PLCs currently connected to `PLCPORT` with `sqlio2 client -p FANPORT hexdata`.
 
 # Printer
-Send to printer with `sqlio2 client -p PRINTERPORT -r videojet -t 1000 hexdata` for a transmission with a 1 second timeout.
+Send to printer with `sqlio2 client -h PRINTERHOST -p PRINTERPORT -r videojet -t 1000 hexdata` for a transmission with a 1 second timeout.
