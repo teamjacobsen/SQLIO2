@@ -16,7 +16,7 @@ namespace SQLIO2.Protocols
 
         public Func<TcpClient, Task> Create(string name, RequestDelegate stack)
         {
-            if (name.Equals("videojet", StringComparison.OrdinalIgnoreCase))
+            if (name?.Equals("videojet", StringComparison.OrdinalIgnoreCase) == true)
             {
                 return ActivatorUtilities.CreateInstance<VideojetProtocol>(_services, stack).ProcessAsync;
             }
