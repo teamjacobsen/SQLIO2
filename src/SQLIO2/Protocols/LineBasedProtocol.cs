@@ -11,7 +11,7 @@ namespace SQLIO2
 {
     abstract class LineBasedProtocol
     {
-        private static byte[] NewlineCharacters = new byte[]
+        private static readonly byte[] NewlineCharacters = new byte[]
         {
             (byte)'\r',
             (byte)'\n'
@@ -93,11 +93,13 @@ namespace SQLIO2
 
                     if (position != null)
                     {
-                        // Process the line
-                        ProcessLine(client, buffer.Slice(0, position.Value));
+                        var nextPosition = buffer.GetPosition(1, position.Value);
 
-                        // Skip the line + the \n character (basically position)
-                        buffer = buffer.Slice(buffer.GetPosition(1, position.Value));
+                        // Process the line (including the newline character)
+                        ProcessLine(client, buffer.Slice(0, nextPosition));
+
+                        // Skip the line + the newline character
+                        buffer = buffer.Slice(nextPosition);
                     }
                 }
                 while (position != null);
@@ -128,7 +130,7 @@ namespace SQLIO2
                     {
                         var packet = new Packet(scope.ServiceProvider, client, data);
 
-                        _logger.LogInformation("Handling packet {Data} from {RemoteEndpoint}", data, client.Client.RemoteEndPoint);
+                        _logger.LogInformation("Handling packet {DataAscii} from {RemoteEndpoint}", Encoding.ASCII.GetString(data), client.Client.RemoteEndPoint);
 
                         await _stack(packet);
                     }

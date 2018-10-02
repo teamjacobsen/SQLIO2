@@ -82,13 +82,18 @@ namespace SQLIO2
 
             if (FanoutPort != null)
             {
-                var stack = new StackBuilder(services)
-                    .Use<ProxyFanoutMiddleware>()
-                    .Build();
+                fanoutServer = serverFactory.Create(new IPEndPoint(IPAddress.Loopback, FanoutPort.Value), async client =>
+                {
+                    var proxyService = services.GetRequiredService<ProxyService>();
+                    var clientStream = client.GetStream();
 
-                var protocol = protocolFactory.Create(ProtocolName, stack);
-
-                fanoutServer = serverFactory.Create(new IPEndPoint(IPAddress.Loopback, FanoutPort.Value), protocol);
+                    int bytesRead;
+                    var buffer = new byte[1024];
+                    while ((bytesRead = await clientStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                    {
+                        await proxyService.FanoutAsync(buffer.AsMemory(0, bytesRead));
+                    }
+                });
 
                 await fanoutServer.StartListeningAsync();
 

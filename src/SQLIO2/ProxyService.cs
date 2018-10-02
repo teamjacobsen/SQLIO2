@@ -23,7 +23,7 @@ namespace SQLIO2
             return _devices.TryAdd(client.Client.RemoteEndPoint, client);
         }
 
-        public async Task<int> FanoutAsync(byte[] data)
+        public async Task<int> FanoutAsync(Memory<byte> data)
         {
             var count = 0;
 
@@ -39,6 +39,8 @@ namespace SQLIO2
                 try
                 {
                     var stream = client.GetStream();
+
+                    _logger.LogInformation("Writing: {Data}", data);
 
                     await stream.WriteAsync(data);
 
