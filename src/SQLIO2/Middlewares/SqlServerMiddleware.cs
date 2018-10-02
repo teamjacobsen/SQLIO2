@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using System.Data;
 using System.Data.SqlClient;
 using System.Data.SqlTypes;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace SQLIO2.Middlewares
@@ -22,6 +23,9 @@ namespace SQLIO2.Middlewares
 
         public async Task HandleAsync(Packet packet)
         {
+            var local = GetEndpoint(packet.Client.Client.LocalEndPoint);
+            var remote = GetEndpoint(packet.Client.Client.RemoteEndPoint);
+
             using (var connection = new SqlConnection(_options.Value.ConnectionString))
             {
                 var wasOpen = connection.State == ConnectionState.Open;
@@ -36,10 +40,12 @@ namespace SQLIO2.Middlewares
                     using (var cmd = new SqlCommand(_options.Value.StoredProcedureName, connection))
                     {
                         cmd.CommandType = CommandType.StoredProcedure;
-
-                        cmd.Parameters.Add("@LocalEndpoint", SqlDbType.NVarChar, 50).Value = packet.Client.Client.LocalEndPoint.ToString();
-                        cmd.Parameters.Add("@RemoteEndpoint", SqlDbType.NVarChar, 50).Value = packet.Client.Client.RemoteEndPoint.ToString();
-                        cmd.Parameters.Add("@Request", SqlDbType.VarBinary, 2048).Value = packet;
+                        
+                        cmd.Parameters.Add("@LocalHost", SqlDbType.NVarChar, 256).Value = local.Host;
+                        cmd.Parameters.Add("@LocalPort", SqlDbType.Int).Value = local.Port;
+                        cmd.Parameters.Add("@RemoteHost", SqlDbType.NVarChar, 256).Value = remote.Host;
+                        cmd.Parameters.Add("@RemotePort", SqlDbType.Int).Value = remote.Port;
+                        cmd.Parameters.Add("@Request", SqlDbType.VarBinary, 2048).Value = packet.Raw;
                         var replyParameter = cmd.Parameters.Add("@Reply", SqlDbType.VarBinary, 2048);
                         replyParameter.Direction = ParameterDirection.Output;
 
@@ -71,6 +77,19 @@ namespace SQLIO2.Middlewares
             }
 
             await _next(packet);
+        }
+
+        private static (string Host, int Port) GetEndpoint(EndPoint endpoint)
+        {
+            switch (endpoint)
+            {
+                case DnsEndPoint dns:
+                    return (dns.Host, dns.Port);
+                case IPEndPoint ip:
+                    return (ip.Address.ToString(), ip.Port);
+                default:
+                    return (endpoint.ToString(), 0);
+            }
         }
     }
 }
