@@ -5,13 +5,13 @@ Run `dotnet publish -c Release -r win7-x64` to publish a self contained exe.
 ## Scanner
 Start server listening for incoming connections on `SCANNERPORT`with the command:
 ```
-sqlio2 proxy -d SCANNERPORT
+sqlio2 proxy -l SCANNERPORT
 ```
 
 ## PLC
 Start server listenening for incoming connections on `PLCPORT` with the command:
 ```
-sqlio2 proxy -d PLCPORT -f FANPORT
+sqlio2 proxy -l PLCPORT -f FANPORT
 ```
 Send to all the PLCs currently connected to `PLCPORT` with the command:
 ```

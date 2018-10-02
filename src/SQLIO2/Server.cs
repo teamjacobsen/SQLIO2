@@ -36,7 +36,7 @@ namespace SQLIO2
             _cts = new CancellationTokenSource();
             _cts.Token.Register(() => _listener.Stop());
 
-            _tcs = new TaskCompletionSource<object>();
+            _tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             _ = Task.Run(AcceptConnectionsAsync);
 
