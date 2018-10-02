@@ -4,12 +4,19 @@ using System;
 using System.Buffers;
 using System.IO.Pipelines;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace SQLIO2
 {
     abstract class LineBasedProtocol
     {
+        private static byte[] NewlineCharacters = new byte[]
+        {
+            (byte)'\r',
+            (byte)'\n'
+        };
+
         private readonly RequestDelegate _stack;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger _logger;
@@ -82,7 +89,7 @@ namespace SQLIO2
                 do
                 {
                     // Look for a EOL in the buffer
-                    position = buffer.PositionOf((byte)'\r') ?? buffer.PositionOf((byte)'\n');
+                    position = buffer.PositionOfAny(NewlineCharacters);
 
                     if (position != null)
                     {
@@ -121,7 +128,7 @@ namespace SQLIO2
                     {
                         var packet = new Packet(scope.ServiceProvider, client, data);
 
-                        _logger.LogInformation("Handling packet from {RemoteEndpoint}", client.Client.RemoteEndPoint);
+                        _logger.LogInformation("Handling packet {Data} from {RemoteEndpoint}", data, client.Client.RemoteEndPoint);
 
                         await _stack(packet);
                     }

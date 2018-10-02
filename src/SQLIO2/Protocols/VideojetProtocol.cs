@@ -23,7 +23,7 @@ namespace SQLIO2.Protocols
 
         protected override void ProcessLine(TcpClient client, ReadOnlySequence<byte> line)
         {
-            var position = PositionOf(line, StartBytes);
+            var position = line.PositionOfAny(StartBytes);
 
             if (position != null)
             {
@@ -33,46 +33,6 @@ namespace SQLIO2.Protocols
                 {
                     RunStack(client, data.ToArray());
                 }
-            }
-        }
-
-        private static SequencePosition? PositionOf(in ReadOnlySequence<byte> line, ReadOnlySpan<byte> anyOf)
-        {
-            if (line.IsSingleSegment)
-            {
-                var index = line.First.Span.IndexOfAny(StartBytes);
-
-                if (index >= 0)
-                {
-                    return line.GetPosition(index);
-                }
-
-                return null;
-            }
-            else
-            {
-                // https://github.com/dotnet/corefx/blob/master/src/System.Memory/src/System/Buffers/BuffersExtensions.cs#L36
-
-                var position = line.Start;
-                var origin = position;
-
-                while (line.TryGet(ref position, out var memory))
-                {
-                    var index = memory.Span.IndexOfAny(anyOf);
-
-                    if (index >= 0)
-                    {
-                        return line.GetPosition(index, origin);
-                    }
-                    else if (position.GetObject() == null)
-                    {
-                        break;
-                    }
-
-                    origin = position;
-                }
-
-                return null;
             }
         }
     }
