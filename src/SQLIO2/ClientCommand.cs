@@ -43,41 +43,48 @@ namespace SQLIO2
                     await client.ConnectAsync(IPAddress.Loopback, Port);
                 }
 
-                var data = ToByteArray(DataHex);
-
-                var stream = client.GetStream();
-
-                await stream.WriteAsync(data);
-                await stream.FlushAsync();
-
-                if (TimeoutMs != null)
+                try
                 {
-                    var services = new ServiceCollection()
-                        .AddLogging(options => options.AddConsole())
-                        .AddSingleton<ProtocolFactory>()
-                        .BuildServiceProvider();
+                    var data = ToByteArray(DataHex);
 
-                    var protocolFactory = services.GetRequiredService<ProtocolFactory>();
+                    var stream = client.GetStream();
 
-                    var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    await stream.WriteAsync(data);
+                    await stream.FlushAsync();
 
-                    var protocol = protocolFactory.Create(ProtocolName, packet =>
+                    if (TimeoutMs != null)
                     {
-                        Console.WriteLine(ToHexString(packet.Raw));
+                        var services = new ServiceCollection()
+                            .AddLogging(options => options.AddConsole())
+                            .AddSingleton<ProtocolFactory>()
+                            .BuildServiceProvider();
 
-                        tcs.SetResult(null);
+                        var protocolFactory = services.GetRequiredService<ProtocolFactory>();
 
-                        return Task.CompletedTask;
-                    });
+                        var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-                    _ = Task.Run(() => protocol(client));
+                        var protocol = protocolFactory.Create(ProtocolName, packet =>
+                        {
+                            Console.WriteLine(ToHexString(packet.Raw));
 
-                    await Task.WhenAny(tcs.Task, Task.Delay(TimeoutMs.Value));
+                            tcs.SetResult(null);
 
-                    if (!tcs.Task.IsCompleted)
-                    {
-                        return 1;
+                            return Task.CompletedTask;
+                        });
+
+                        _ = Task.Run(() => protocol(client));
+
+                        await Task.WhenAny(tcs.Task, Task.Delay(TimeoutMs.Value));
+
+                        if (!tcs.Task.IsCompleted)
+                        {
+                            return 1;
+                        }
                     }
+                }
+                finally
+                {
+                    client.Client.DisconnectAsync(new SocketAsyncEventArgs() { DisconnectReuseSocket = false });
                 }
             }
 
