@@ -43,7 +43,7 @@ namespace SQLIO2
                 {
                     var stream = client.GetStream();
 
-                    _logger.LogInformation("Writing {DataAscii} to {RemoteEndpoint}", Encoding.ASCII.GetString(dataArray), endpoint);
+                    _logger.LogInformation("Writing {DataAscii} to {RemoteEndpoint}", Encoding.ASCII.GetString(dataArray).Replace("\r", "\\r").Replace("\n", "\\n"), endpoint);
 
                     await stream.WriteAsync(data);
                     await stream.FlushAsync();

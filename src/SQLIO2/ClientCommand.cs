@@ -1,5 +1,4 @@
-﻿using McMaster.Extensions.CommandLineUtils;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SQLIO2.Protocols;
 using System;
@@ -14,24 +13,24 @@ namespace SQLIO2
 {
     class ClientCommand
     {
-        [Option("-h|--host", CommandOptionType.SingleValue)]
+        [Option("-h|--host")]
         public string Host { get; set; }
 
+        [Option("-p|--port")]
         [Required]
-        [Option("-p|--port", CommandOptionType.SingleValue)]
         public int Port { get; set; }
 
         [Required]
-        [Argument(0, "data")]
+        [Argument(0)]
         public string DataHex { get; set; }
 
-        [Option("-t|--reply-timeout", CommandOptionType.SingleValue)]
+        [Option("-t|--reply-timeout")]
         public int? TimeoutMs { get; set; }
 
-        [Option("-r|--reply-protocol-name", CommandOptionType.SingleValue)]
+        [Option("-r|--reply-protocol-name")]
         public string ProtocolName { get; set; }
 
-        public async Task<int> OnExecuteAsync(IConsole console)
+        public async Task<int> HandleAsync()
         {
             using (var client = new TcpClient())
             {
@@ -64,7 +63,7 @@ namespace SQLIO2
 
                     var protocol = protocolFactory.Create(ProtocolName, packet =>
                     {
-                        console.Error.WriteLine(ToHexString(packet.Raw));
+                        Console.Error.WriteLine(ToHexString(packet.Raw));
 
                         tcs.SetResult(null);
 
