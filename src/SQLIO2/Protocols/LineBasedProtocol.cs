@@ -130,7 +130,7 @@ namespace SQLIO2
                     {
                         var packet = new Packet(scope.ServiceProvider, client, data);
 
-                        _logger.LogInformation("Handling packet {DataAscii} from {RemoteEndpoint}", Encoding.ASCII.GetString(data), client.Client.RemoteEndPoint);
+                        _logger.LogInformation("Handling packet {DataAscii} from {RemoteEndpoint}", Encoding.ASCII.GetString(data).Replace("\r", "\\r").Replace("\n", "\\n"), client.Client.RemoteEndPoint);
 
                         await _stack(packet);
                     }
