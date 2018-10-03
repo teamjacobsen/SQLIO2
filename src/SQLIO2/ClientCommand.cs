@@ -84,7 +84,7 @@ namespace SQLIO2
                 }
                 finally
                 {
-                    client.Client.DisconnectAsync(new SocketAsyncEventArgs() { DisconnectReuseSocket = false });
+                    client.Client.Disconnect(reuseSocket: false);
                 }
             }
 
