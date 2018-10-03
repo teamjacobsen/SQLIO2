@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace SQLIO2
@@ -27,6 +28,8 @@ namespace SQLIO2
         {
             var count = 0;
 
+            var dataArray = data.ToArray();
+
             foreach (var (endpoint, client) in _devices)
             {
                 if (!client.Connected)
@@ -40,7 +43,7 @@ namespace SQLIO2
                 {
                     var stream = client.GetStream();
 
-                    _logger.LogInformation("Writing: {Data}", data);
+                    _logger.LogInformation("Writing {DataAscii} to {RemoteEndpoint}", Encoding.ASCII.GetString(dataArray), endpoint);
 
                     await stream.WriteAsync(data);
                     await stream.FlushAsync();
