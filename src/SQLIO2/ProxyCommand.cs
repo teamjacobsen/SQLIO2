@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SQLIO2.Middlewares;
@@ -12,8 +13,8 @@ namespace SQLIO2
 {
     class ProxyCommand
     {
-        [Option("-l|--listen-port")]
         [Required]
+        [Option("-l|--listen-port")]
         public int ListenPort { get; set; }
 
         [Option("-f|--fanout-port")]
@@ -22,7 +23,7 @@ namespace SQLIO2
         [Option("-r|--protocol-name")]
         public string ProtocolName { get; set; }
 
-        public async Task<int> HandleAsync()
+        public async Task<int> OnExecuteAsync(IConsole console)
         {
             var shutdownTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -76,7 +77,7 @@ namespace SQLIO2
 
                 await deviceServer.StartListeningAsync();
 
-                Console.WriteLine($"Listening for device on {deviceServer.LocalEndpoint}");
+                console.WriteLine($"Listening for device on {deviceServer.LocalEndpoint}");
             }
 
             if (FanoutPort != null)
@@ -96,10 +97,10 @@ namespace SQLIO2
 
                 await fanoutServer.StartListeningAsync();
 
-                Console.WriteLine($"Listening for fanout on {fanoutServer.LocalEndpoint}");
+                console.WriteLine($"Listening for fanout on {fanoutServer.LocalEndpoint}");
             }
 
-            Console.WriteLine("Press Ctrl+C to exit the program");
+            console.WriteLine("Press Ctrl+C to exit the program");
 
             await shutdownTcs.Task;
 
@@ -110,7 +111,7 @@ namespace SQLIO2
                 await fanoutServer.StopListeningAsync();
             }
 
-            Console.WriteLine("Goodbye...");
+            console.WriteLine("Goodbye...");
 
             return 0;
         }
