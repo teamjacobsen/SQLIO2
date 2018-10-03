@@ -63,12 +63,15 @@ namespace SQLIO2
                 
                 deviceServer = serverFactory.Create(new IPEndPoint(IPAddress.Any, ListenPort), client =>
                 {
-                    var proxyService = services.GetRequiredService<ProxyService>();
-                    var logger = services.GetRequiredService<ILogger<ProxyCommand>>();
-
-                    if (proxyService.TryRegister(client))
+                    if (FanoutPort != null)
                     {
-                        logger.LogInformation("Registered {RemoteEndpoint} for fanout through proxy", client.Client.RemoteEndPoint);
+                        var proxyService = services.GetRequiredService<ProxyService>();
+                        var logger = services.GetRequiredService<ILogger<ProxyCommand>>();
+
+                        if (proxyService.TryRegister(client))
+                        {
+                            logger.LogInformation("Registered {RemoteEndpoint} for fanout through proxy", client.Client.RemoteEndPoint);
+                        }
                     }
 
                     return protocol(client);
