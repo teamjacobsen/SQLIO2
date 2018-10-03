@@ -43,6 +43,7 @@ namespace SQLIO2
                     _logger.LogInformation("Writing: {Data}", data);
 
                     await stream.WriteAsync(data);
+                    await stream.FlushAsync();
 
                     count++;
                 }

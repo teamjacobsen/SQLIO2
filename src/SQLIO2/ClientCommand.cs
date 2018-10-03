@@ -44,10 +44,12 @@ namespace SQLIO2
                     await client.ConnectAsync(IPAddress.Loopback, Port);
                 }
 
-                var stream = client.GetStream();
                 var data = ToByteArray(DataHex);
 
+                var stream = client.GetStream();
+
                 await stream.WriteAsync(data);
+                await stream.FlushAsync();
 
                 if (TimeoutMs != null)
                 {

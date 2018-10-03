@@ -57,7 +57,10 @@ namespace SQLIO2.Middlewares
                         {
                             var reply = (byte[])replyParameter.Value;
 
-                            await packet.Client.GetStream().WriteAsync(reply);
+                            var stream = packet.Client.GetStream();
+
+                            await stream.WriteAsync(reply);
+                            await stream.FlushAsync();
                         }
                     }
                 }
