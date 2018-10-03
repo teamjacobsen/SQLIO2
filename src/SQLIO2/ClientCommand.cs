@@ -63,16 +63,21 @@ namespace SQLIO2
 
                     var protocol = protocolFactory.Create(ProtocolName, packet =>
                     {
-                        Console.Error.WriteLine(ToHexString(packet.Raw));
+                        Console.WriteLine(ToHexString(packet.Raw));
 
                         tcs.SetResult(null);
 
                         return Task.CompletedTask;
                     });
 
-                    client.ReceiveTimeout = TimeoutMs.Value;
+                    _ = Task.Run(() => protocol(client));
 
-                    await Task.WhenAny(protocol(client), tcs.Task);
+                    await Task.WhenAny(tcs.Task, Task.Delay(TimeoutMs.Value));
+
+                    if (!tcs.Task.IsCompleted)
+                    {
+                        return 1;
+                    }
                 }
             }
 
