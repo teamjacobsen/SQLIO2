@@ -61,6 +61,7 @@ namespace SQLIO2
                 catch (Exception e)
                 {
                     _logger.LogError(e, "Unable to receive on socket");
+
                     break;
                 }
 
@@ -75,6 +76,8 @@ namespace SQLIO2
 
             // Tell the PipeReader that there's no more data coming
             writer.Complete();
+
+            _logger.LogInformation("Client {RemoteEndpoint} was disconnected", socket.RemoteEndPoint);
         }
 
         private async Task ReadPipeAsync(TcpClient client, PipeReader reader)

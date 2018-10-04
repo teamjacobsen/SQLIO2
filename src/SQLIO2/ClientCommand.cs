@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using SQLIO2.Protocols;
 using System;
@@ -56,6 +57,7 @@ namespace SQLIO2
                     {
                         var services = new ServiceCollection()
                             .AddLogging(options => options.AddConsole())
+                            .Replace(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(TimedLogger<>)))
                             .AddSingleton<ProtocolFactory>()
                             .BuildServiceProvider();
 

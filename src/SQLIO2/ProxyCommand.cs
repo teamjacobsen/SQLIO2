@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using SQLIO2.Middlewares;
 using SQLIO2.Protocols;
@@ -42,6 +43,7 @@ namespace SQLIO2
 
             var services = new ServiceCollection()
                 .AddLogging(options => options.AddConsole())
+                .Replace(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(TimedLogger<>)))
                 .AddSingleton<ProtocolFactory>()
                 .AddSingleton<ServerFactory>()
                 .AddSingleton<ProxyService>()
@@ -87,6 +89,8 @@ namespace SQLIO2
                 fanoutServer = serverFactory.Create(new IPEndPoint(IPAddress.Loopback, FanoutPort.Value), async client =>
                 {
                     var proxyService = services.GetRequiredService<ProxyService>();
+                    var logger = services.GetRequiredService<ILogger<ProxyCommand>>();
+
                     var clientStream = client.GetStream();
 
                     int bytesRead;
@@ -95,6 +99,8 @@ namespace SQLIO2
                     {
                         await proxyService.FanoutAsync(buffer.AsMemory(0, bytesRead));
                     }
+
+                    logger.LogInformation("Fanout client {RemoteEndpoint} was disconnected", client.Client.RemoteEndPoint);
                 });
 
                 await fanoutServer.StartListeningAsync();
