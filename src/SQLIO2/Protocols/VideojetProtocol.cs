@@ -22,16 +22,13 @@ namespace SQLIO2.Protocols
 
         protected override void ProcessLine(TcpClient client, ReadOnlySequence<byte> line)
         {
-            var position = line.PositionOfAny(StartBytes);
+            var reader = new SequenceReader<byte>(line);
 
-            if (position != null)
+            if (reader.TryAdvanceToAny(StartBytes, advancePastDelimiter: false))
             {
-                var data = line.Slice(position.Value);
+                var data = line.Slice(reader.Position);
 
-                if (data.Length > 0)
-                {
-                    RunStack(client, data.ToArray());
-                }
+                RunStack(client, data.ToArray());
             }
         }
     }

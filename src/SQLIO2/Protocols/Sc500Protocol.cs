@@ -14,6 +14,7 @@ namespace SQLIO2.Protocols
         private readonly RequestDelegate _stack;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger _logger;
+        private static readonly byte[] StartBytes = Encoding.UTF8.GetBytes("<msg");
         private static readonly byte[] EndBytes = Encoding.UTF8.GetBytes("</msg>");
 
         public Sc500Protocol(RequestDelegate stack, IServiceScopeFactory serviceScopeFactory, ILogger<Sc500Protocol> logger) : base(logger)
@@ -27,10 +28,16 @@ namespace SQLIO2.Protocols
         {
             var reader = new SequenceReader<byte>(sequence);
 
-            while (reader.TryReadTo(out ReadOnlySequence<byte> xmlBytes, EndBytes, advancePastDelimiter: true))
+            while (reader.TryReadTo(out ReadOnlySequence<byte> untilEndBytes, EndBytes, advancePastDelimiter: true))
             {
-                var xmlBytesWithEndBytes = reader.Sequence.Slice(xmlBytes.Start, xmlBytes.Length + EndBytes.Length);
-                ProcessXml(client, xmlBytesWithEndBytes);
+                var untilStartReader = new SequenceReader<byte>(untilEndBytes);
+
+                if (untilStartReader.TryReadTo(out var _, StartBytes, advancePastDelimiter: false))
+                {
+                    var xmlBytesWithEndBytes = reader.Sequence.Slice(untilStartReader.Position, untilStartReader.Remaining + EndBytes.Length);
+
+                    ProcessXml(client, xmlBytesWithEndBytes);
+                }
             }
 
             return reader.Position;
