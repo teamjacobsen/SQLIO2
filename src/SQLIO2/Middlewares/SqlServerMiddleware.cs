@@ -33,15 +33,16 @@ namespace SQLIO2.Middlewares
                 await connection.OpenAsync();
             }
 
+            bool handled;
             try
             {
                 if (packet.Xml is object)
                 {
-                    await HandleXmlAsync(connection, packet);
+                    handled = await HandleXmlAsync(connection, packet);
                 }
                 else
                 {
-                    await HandleRawAsync(connection, packet);
+                    handled = await HandleRawAsync(connection, packet);
                 }
             }
             catch (SqlException e)
@@ -58,10 +59,13 @@ namespace SQLIO2.Middlewares
                 }
             }
 
-            await _next(packet);
+            if (!handled)
+            {
+                await _next(packet);
+            }
         }
 
-        private async Task HandleXmlAsync(SqlConnection connection, Packet packet)
+        private async Task<bool> HandleXmlAsync(SqlConnection connection, Packet packet)
         {
             var local = GetEndpoint(packet.Client.Client.LocalEndPoint);
             var remote = GetEndpoint(packet.Client.Client.RemoteEndPoint);
@@ -94,10 +98,14 @@ namespace SQLIO2.Middlewares
 
                 await stream.WriteAsync(Encoding.UTF8.GetBytes(msg.OuterXml));
                 await stream.FlushAsync();
+
+                return true;
             }
+
+            return false;
         }
 
-        private async Task HandleRawAsync(SqlConnection connection, Packet packet)
+        private async Task<bool> HandleRawAsync(SqlConnection connection, Packet packet)
         {
             var local = GetEndpoint(packet.Client.Client.LocalEndPoint);
             var remote = GetEndpoint(packet.Client.Client.RemoteEndPoint);
@@ -127,7 +135,11 @@ namespace SQLIO2.Middlewares
 
                 await stream.WriteAsync(reply);
                 await stream.FlushAsync();
+
+                return true;
             }
+
+            return false;
         }
 
         private static EndpointDetails GetEndpoint(EndPoint endpoint)

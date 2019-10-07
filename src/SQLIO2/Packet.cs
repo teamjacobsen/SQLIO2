@@ -19,10 +19,11 @@ namespace SQLIO2
             Raw = raw;
         }
 
-        public Packet(IServiceProvider serviceProvider, TcpClient client, XmlDocument xml)
+        public Packet(IServiceProvider serviceProvider, TcpClient client, byte[] raw, XmlDocument xml)
         {
             ServiceProvider = serviceProvider;
             Client = client;
+            Raw = raw;
             Xml = xml;
         }
 

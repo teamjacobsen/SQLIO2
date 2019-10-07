@@ -34,6 +34,9 @@ namespace SQLIO2
         [Option("-r|--reply-protocol-name")]
         public string ProtocolName { get; set; }
 
+        [Option("-v|--verbose")]
+        public bool Verbose { get; set; }
+
         public async Task<int> HandleAsync()
         {
             using (var client = new TcpClient())
@@ -68,7 +71,13 @@ namespace SQLIO2
                     if (TimeoutMs != null)
                     {
                         var services = new ServiceCollection()
-                            .AddLogging(options => options.AddConsole())
+                            .AddLogging(options =>
+                            {
+                                if (Verbose)
+                                {
+                                    options.AddConsole();
+                                }
+                            })
                             .Replace(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(TimedLogger<>)))
                             .AddSingleton<ProtocolFactory>()
                             .BuildServiceProvider();

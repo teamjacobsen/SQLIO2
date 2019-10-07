@@ -45,13 +45,14 @@ namespace SQLIO2.Protocols
 
         private void ProcessXml(TcpClient client, ReadOnlySequence<byte> xml)
         {
+            var raw = xml.ToArray();
             var msg = new XmlDocument();
-            msg.LoadXml(Encoding.UTF8.GetString(xml.ToArray()));
+            msg.LoadXml(Encoding.UTF8.GetString(raw));
 
-            RunStack(client, msg);
+            RunStack(client, raw, msg);
         }
 
-        protected void RunStack(TcpClient client, XmlDocument xml)
+        protected void RunStack(TcpClient client, byte[] raw, XmlDocument xml)
         {
             _ = Task.Run(async () =>
             {
@@ -59,7 +60,7 @@ namespace SQLIO2.Protocols
                 {
                     using (var scope = _serviceScopeFactory.CreateScope())
                     {
-                        var packet = new Packet(scope.ServiceProvider, client, xml);
+                        var packet = new Packet(scope.ServiceProvider, client, raw, xml);
 
                         _logger.LogInformation("Handling packet {Xml} from {RemoteEndpoint}", xml.OuterXml, client.Client.RemoteEndPoint);
 

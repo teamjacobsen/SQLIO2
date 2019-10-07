@@ -76,6 +76,17 @@ namespace SQLIO2
 
                 var stack = new StackBuilder(_host.Services)
                     .Use<SqlServerMiddleware>()
+                    .Use(next =>
+                    {
+                        return async (packet) =>
+                        {
+                            if (FanoutPort != null)
+                            {
+                                await _proxyService.FanoutAsync(packet.Raw, remoteClient);
+                            }
+                            await next(packet);
+                        };
+                    })
                     .Build();
 
                 var protocolFactory = _host.Services.GetRequiredService<ProtocolFactory>();
@@ -140,6 +151,11 @@ namespace SQLIO2
         {
             return _serverFactory.Create(new IPEndPoint(IPAddress.Loopback, FanoutPort.Value), async client =>
             {
+                if (_proxyService.TryRegister(client))
+                {
+                    _logger.LogInformation("Registered for fanout through proxy");
+                }
+
                 using var clientStream = client.GetStream();
                 var reader = PipeReader.Create(clientStream);
 
@@ -154,7 +170,7 @@ namespace SQLIO2
 
                     foreach (var segment in result.Buffer)
                     {
-                        await _proxyService.FanoutAsync(segment);
+                        await _proxyService.FanoutAsync(segment, client);
                     }
 
                     reader.AdvanceTo(result.Buffer.End);

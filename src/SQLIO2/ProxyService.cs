@@ -24,12 +24,17 @@ namespace SQLIO2
             return _devices.TryAdd(client.Client.RemoteEndPoint, client);
         }
 
-        public async Task<int> FanoutAsync(ReadOnlyMemory<byte> data)
+        public async Task<int> FanoutAsync(ReadOnlyMemory<byte> data, TcpClient except)
         {
             var count = 0;
 
             foreach (var (endpoint, client) in _devices)
             {
+                if (client == except)
+                {
+                    continue;
+                }
+
                 if (!client.Connected)
                 {
                     LogErrorAndRemoveEndpoint("NotConnected");
