@@ -5,6 +5,7 @@ using SQLIO2.Protocols;
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -21,9 +22,11 @@ namespace SQLIO2
         [Required]
         public int Port { get; set; }
 
-        [Required]
         [Argument(0)]
         public string DataHexOrXml { get; set; }
+
+        [Option("-f|--filename")]
+        public string Filename { get; set; }
 
         [Option("-t|--reply-timeout")]
         public int? TimeoutMs { get; set; }
@@ -46,11 +49,20 @@ namespace SQLIO2
 
                 try
                 {
-                    var data = GetDataBytes();
-
                     var stream = client.GetStream();
 
-                    await stream.WriteAsync(data);
+                    if (Filename is object)
+                    {
+                        using var file = File.OpenRead(Filename);
+                        await file.CopyToAsync(stream);
+                    }
+                    else
+                    {
+                        var data = GetDataBytes();
+
+                        await stream.WriteAsync(data);
+                    }
+
                     await stream.FlushAsync();
 
                     if (TimeoutMs != null)

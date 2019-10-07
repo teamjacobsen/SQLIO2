@@ -5,7 +5,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SQLIO2.Middlewares;
 using SQLIO2.Protocols;
-using System;
 using System.ComponentModel.DataAnnotations;
 using System.IO.Pipelines;
 using System.Net;
