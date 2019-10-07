@@ -5,9 +5,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SQLIO2.Middlewares;
 using SQLIO2.Protocols;
-using System.ComponentModel.DataAnnotations;
 using System.IO.Pipelines;
 using System.Net;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 
 namespace SQLIO2
@@ -20,8 +20,13 @@ namespace SQLIO2
         private ProxyService _proxyService;
 
         [Option("-l|--listen-port")]
-        [Required]
-        public int ListenPort { get; set; }
+        public int? ListenPort { get; set; }
+
+        [Option("-h|--host")]
+        public string RemoteHost { get; set; }
+
+        [Option("-p|--port")]
+        public int? RemotePort { get; set; }
 
         [Option("-f|--fanout-port")]
         public int? FanoutPort { get; set; }
@@ -47,9 +52,37 @@ namespace SQLIO2
             _serverFactory = _host.Services.GetRequiredService<ServerFactory>();
             _proxyService = _host.Services.GetRequiredService<ProxyService>();
 
-            var deviceServer = CreateDeviceServer();
-            await deviceServer.StartListeningAsync();
-            _logger.LogInformation("Listening for device on {DeviceServerLocalEndpoint}", deviceServer.LocalEndpoint);
+            Server deviceServer = null;
+            TcpClient remoteClient = null;
+            if (ListenPort != null)
+            {
+                deviceServer = CreateDeviceServer();
+                await deviceServer.StartListeningAsync();
+                _logger.LogInformation("Listening for device on {DeviceServerLocalEndpoint}", deviceServer.LocalEndpoint);
+            }
+            else if (RemoteHost != null && RemotePort != null)
+            {
+                remoteClient = new TcpClient();
+                await remoteClient.ConnectAsync(RemoteHost, RemotePort.Value);
+                _logger.LogInformation("Connected to device on {RemoteClientRemoteEndpoint}", remoteClient.Client.RemoteEndPoint);
+
+                if (FanoutPort != null)
+                {
+                    if (_proxyService.TryRegister(remoteClient))
+                    {
+                        _logger.LogInformation("Registered remote device {RemoteEndpoint} for fanout through proxy", remoteClient.Client.RemoteEndPoint);
+                    }
+                }
+
+                var stack = new StackBuilder(_host.Services)
+                    .Use<SqlServerMiddleware>()
+                    .Build();
+
+                var protocolFactory = _host.Services.GetRequiredService<ProtocolFactory>();
+                var protocol = protocolFactory.Create(ProtocolName, stack);
+
+                _ = Task.Run(() => protocol(remoteClient));
+            }
 
             Server fanoutServer = null;
             if (FanoutPort != null)
@@ -61,7 +94,16 @@ namespace SQLIO2
 
             await _host.RunAsync();
 
-            await deviceServer.StopListeningAsync();
+            if (deviceServer != null)
+            {
+                await deviceServer.StopListeningAsync();
+            }
+
+            if (remoteClient != null)
+            {
+                remoteClient.Client.Disconnect(reuseSocket: true);
+                remoteClient.Dispose();
+            }
 
             if (fanoutServer != null)
             {
@@ -80,7 +122,7 @@ namespace SQLIO2
             var protocolFactory = _host.Services.GetRequiredService<ProtocolFactory>();
             var protocol = protocolFactory.Create(ProtocolName, stack);
 
-            return _serverFactory.Create(new IPEndPoint(IPAddress.Any, ListenPort), client =>
+            return _serverFactory.Create(new IPEndPoint(IPAddress.Any, ListenPort.Value), client =>
             {
                 if (FanoutPort != null)
                 {
@@ -114,6 +156,8 @@ namespace SQLIO2
                     {
                         await _proxyService.FanoutAsync(segment);
                     }
+
+                    reader.AdvanceTo(result.Buffer.End);
                 }
 
                 _logger.LogInformation("Fanout client {RemoteEndpoint} was disconnected", client.Client.RemoteEndPoint);
