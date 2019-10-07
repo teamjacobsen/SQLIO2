@@ -20,6 +20,10 @@ namespace SQLIO2.Protocols
             {
                 return ActivatorUtilities.CreateInstance<VideojetProtocol>(_services, stack).ProcessAsync;
             }
+            else if (name?.Equals("sc500", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return ActivatorUtilities.CreateInstance<Sc500Protocol>(_services, stack).ProcessAsync;
+            }
             else
             {
                 return ActivatorUtilities.CreateInstance<DefaultProtocol>(_services, stack).ProcessAsync;

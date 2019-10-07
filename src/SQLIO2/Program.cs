@@ -86,7 +86,7 @@ namespace SQLIO2
                 }
             }
 
-            object ConvertArgument(string arg, Type propertyType) => Convert.ChangeType(arg, Nullable.GetUnderlyingType(propertyType) ?? propertyType);
+            static object ConvertArgument(string arg, Type propertyType) => Convert.ChangeType(arg, Nullable.GetUnderlyingType(propertyType) ?? propertyType);
 
             return cmd;
         }

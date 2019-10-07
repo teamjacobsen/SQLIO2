@@ -5,15 +5,15 @@ namespace SQLIO2
 {
     static class ReadOnlySequenceExtensions
     {
-        public static SequencePosition? PositionOfAny(this in ReadOnlySequence<byte> line, ReadOnlySpan<byte> anyOf)
+        public static SequencePosition? PositionOfAny(this in ReadOnlySequence<byte> sequence, ReadOnlySpan<byte> anyOf)
         {
-            if (line.IsSingleSegment)
+            if (sequence.IsSingleSegment)
             {
-                var index = line.First.Span.IndexOfAny(anyOf);
+                var index = sequence.First.Span.IndexOfAny(anyOf);
 
                 if (index >= 0)
                 {
-                    return line.GetPosition(index);
+                    return sequence.GetPosition(index);
                 }
 
                 return null;
@@ -22,18 +22,18 @@ namespace SQLIO2
             {
                 // https://github.com/dotnet/corefx/blob/master/src/System.Memory/src/System/Buffers/BuffersExtensions.cs#L36
 
-                var position = line.Start;
+                var position = sequence.Start;
                 var origin = position;
 
-                while (line.TryGet(ref position, out var memory))
+                while (sequence.TryGet(ref position, out var memory))
                 {
                     var index = memory.Span.IndexOfAny(anyOf);
 
                     if (index >= 0)
                     {
-                        return line.GetPosition(index, origin);
+                        return sequence.GetPosition(index, origin);
                     }
-                    else if (position.GetObject() == null)
+                    else if (position.GetObject() is null)
                     {
                         break;
                     }

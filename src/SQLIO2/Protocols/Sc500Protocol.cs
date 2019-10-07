@@ -5,22 +5,18 @@ using System.Buffers;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 
 namespace SQLIO2.Protocols
 {
-    abstract class LineBasedProtocol : ProtocolBase
+    class Sc500Protocol : ProtocolBase
     {
-        private static readonly byte[] NewlineCharacters = new byte[]
-        {
-            (byte)'\r',
-            (byte)'\n'
-        };
-
         private readonly RequestDelegate _stack;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger _logger;
+        private static readonly byte[] EndBytes = Encoding.UTF8.GetBytes("</msg>");
 
-        public LineBasedProtocol(RequestDelegate stack, IServiceScopeFactory serviceScopeFactory, ILogger logger) : base(logger)
+        public Sc500Protocol(RequestDelegate stack, IServiceScopeFactory serviceScopeFactory, ILogger<Sc500Protocol> logger) : base(logger)
         {
             _stack = stack;
             _serviceScopeFactory = serviceScopeFactory;
@@ -31,19 +27,24 @@ namespace SQLIO2.Protocols
         {
             var reader = new SequenceReader<byte>(sequence);
 
-            while (reader.TryReadToAny(out ReadOnlySequence<byte> lineBytes, NewlineCharacters, advancePastDelimiter: true))
+            while (reader.TryReadTo(out ReadOnlySequence<byte> xmlBytes, EndBytes, advancePastDelimiter: true))
             {
-                var lineBytesWithNewline = reader.Sequence.Slice(lineBytes.Start, lineBytes.Length + 1);
-
-                ProcessLine(client, lineBytesWithNewline);
+                var xmlBytesWithEndBytes = reader.Sequence.Slice(xmlBytes.Start, xmlBytes.Length + EndBytes.Length);
+                ProcessXml(client, xmlBytesWithEndBytes);
             }
 
             return reader.Position;
         }
 
-        protected abstract void ProcessLine(TcpClient client, ReadOnlySequence<byte> line);
+        private void ProcessXml(TcpClient client, ReadOnlySequence<byte> xml)
+        {
+            var msg = new XmlDocument();
+            msg.LoadXml(Encoding.UTF8.GetString(xml.ToArray()));
 
-        protected void RunStack(TcpClient client, byte[] data)
+            //RunStack(client, xml);
+        }
+
+        protected void RunStack(TcpClient client, XmlDocument xml)
         {
             _ = Task.Run(async () =>
             {
@@ -51,11 +52,11 @@ namespace SQLIO2.Protocols
                 {
                     using (var scope = _serviceScopeFactory.CreateScope())
                     {
-                        var packet = new Packet(scope.ServiceProvider, client, data);
+                        //var packet = new Packet(scope.ServiceProvider, client, xmlBytes);
 
-                        _logger.LogInformation("Handling packet {DataAscii} from {RemoteEndpoint}", Encoding.ASCII.GetString(data).Replace("\r", "\\r").Replace("\n", "\\n"), client.Client.RemoteEndPoint);
+                        //_logger.LogInformation("Handling packet {Xml} from {RemoteEndpoint}", xml, client.Client.RemoteEndPoint);
 
-                        await _stack(packet);
+                        //await _stack(packet);
                     }
                 }
                 catch (Exception e)
