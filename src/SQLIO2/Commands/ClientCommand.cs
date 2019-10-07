@@ -67,7 +67,7 @@ namespace SQLIO2
 
                         var protocol = protocolFactory.Create(ProtocolName, packet =>
                         {
-                            Console.WriteLine(ToHexString(packet.Raw));
+                            Console.WriteLine(packet.ToString());
 
                             tcs.SetResult(null);
 
@@ -120,18 +120,6 @@ namespace SQLIO2
             }
 
             return byteArray;
-        }
-
-        private static string ToHexString(byte[] byteArray)
-        {
-            var builder = new StringBuilder(byteArray.Length * 2);
-
-            foreach (var @byte in byteArray)
-            {
-                builder.AppendFormat("{0:x2}", @byte);
-            }
-
-            return builder.ToString();
         }
     }
 }

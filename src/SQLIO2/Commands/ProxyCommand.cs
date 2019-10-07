@@ -7,6 +7,7 @@ using SQLIO2.Middlewares;
 using SQLIO2.Protocols;
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.IO.Pipelines;
 using System.Net;
 using System.Threading.Tasks;
 
@@ -17,6 +18,7 @@ namespace SQLIO2
         private IHost _host;
         private ILogger<ProxyCommand> _logger;
         private ServerFactory _serverFactory;
+        private ProxyService _proxyService;
 
         [Option("-l|--listen-port")]
         [Required]
@@ -44,6 +46,7 @@ namespace SQLIO2
 
             _logger = _host.Services.GetRequiredService<ILogger<ProxyCommand>>();
             _serverFactory = _host.Services.GetRequiredService<ServerFactory>();
+            _proxyService = _host.Services.GetRequiredService<ProxyService>();
 
             var deviceServer = CreateDeviceServer();
             await deviceServer.StartListeningAsync();
@@ -82,9 +85,7 @@ namespace SQLIO2
             {
                 if (FanoutPort != null)
                 {
-                    var proxyService = _host.Services.GetRequiredService<ProxyService>();
-
-                    if (proxyService.TryRegister(client))
+                    if (_proxyService.TryRegister(client))
                     {
                         _logger.LogInformation("Registered {RemoteEndpoint} for fanout through proxy", client.Client.RemoteEndPoint);
                     }
@@ -98,15 +99,22 @@ namespace SQLIO2
         {
             return _serverFactory.Create(new IPEndPoint(IPAddress.Loopback, FanoutPort.Value), async client =>
             {
-                var proxyService = _host.Services.GetRequiredService<ProxyService>();
+                using var clientStream = client.GetStream();
+                var reader = PipeReader.Create(clientStream);
 
-                var clientStream = client.GetStream();
-
-                int bytesRead;
-                var buffer = new byte[1024];
-                while ((bytesRead = await clientStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                while (true)
                 {
-                    await proxyService.FanoutAsync(buffer.AsMemory(0, bytesRead));
+                    var result = await reader.ReadAsync();
+
+                    if (result.IsCompleted || result.Buffer.IsEmpty)
+                    {
+                        break;
+                    }
+
+                    foreach (var segment in result.Buffer)
+                    {
+                        await _proxyService.FanoutAsync(segment);
+                    }
                 }
 
                 _logger.LogInformation("Fanout client {RemoteEndpoint} was disconnected", client.Client.RemoteEndPoint);

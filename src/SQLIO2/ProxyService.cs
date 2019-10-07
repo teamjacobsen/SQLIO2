@@ -24,11 +24,9 @@ namespace SQLIO2
             return _devices.TryAdd(client.Client.RemoteEndPoint, client);
         }
 
-        public async Task<int> FanoutAsync(Memory<byte> data)
+        public async Task<int> FanoutAsync(ReadOnlyMemory<byte> data)
         {
             var count = 0;
-
-            var dataArray = data.ToArray();
 
             foreach (var (endpoint, client) in _devices)
             {
@@ -43,7 +41,7 @@ namespace SQLIO2
                 {
                     var stream = client.GetStream();
 
-                    _logger.LogInformation("Writing {DataAscii} to {RemoteEndpoint}", Encoding.ASCII.GetString(dataArray).Replace("\r", "\\r").Replace("\n", "\\n"), endpoint);
+                    _logger.LogInformation("Writing {DataAscii} to {RemoteEndpoint}", Encoding.ASCII.GetString(data.Span).Replace("\r", "\\r").Replace("\n", "\\n"), endpoint);
 
                     await stream.WriteAsync(data);
                     await stream.FlushAsync();
