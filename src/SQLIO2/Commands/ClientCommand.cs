@@ -23,7 +23,7 @@ namespace SQLIO2
 
         [Required]
         [Argument(0)]
-        public string DataHex { get; set; }
+        public string DataHexOrXml { get; set; }
 
         [Option("-t|--reply-timeout")]
         public int? TimeoutMs { get; set; }
@@ -46,7 +46,7 @@ namespace SQLIO2
 
                 try
                 {
-                    var data = ToByteArray(DataHex);
+                    var data = GetDataBytes();
 
                     var stream = client.GetStream();
 
@@ -91,6 +91,16 @@ namespace SQLIO2
             }
 
             return 0;
+        }
+
+        private byte[] GetDataBytes()
+        {
+            if (ProtocolName.Equals("sc500", StringComparison.OrdinalIgnoreCase))
+            {
+                return Encoding.UTF8.GetBytes(DataHexOrXml);
+            }
+
+            return ToByteArray(DataHexOrXml);
         }
 
         private static byte[] ToByteArray(string hexString)
