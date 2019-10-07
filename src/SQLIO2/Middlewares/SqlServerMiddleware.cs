@@ -4,7 +4,9 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Data.SqlTypes;
 using System.Net;
+using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 
 namespace SQLIO2.Middlewares
 {
@@ -68,13 +70,14 @@ namespace SQLIO2.Middlewares
             {
                 CommandType = CommandType.StoredProcedure
             };
+            using var xmlReader = new XmlNodeReader(packet.Xml);
 
             cmd.Parameters.Add("@LocalHost", SqlDbType.NVarChar, 256).Value = local.Host;
             cmd.Parameters.Add("@LocalPort", SqlDbType.Int).Value = local.Port;
             cmd.Parameters.Add("@RemoteHost", SqlDbType.NVarChar, 256).Value = remote.Host;
             cmd.Parameters.Add("@RemotePort", SqlDbType.Int).Value = remote.Port;
-            cmd.Parameters.Add("@Request", SqlDbType.Xml, 2048).Value = packet.Xml;
-            var replyParameter = cmd.Parameters.Add("@Reply", SqlDbType.Xml, 2048);
+            cmd.Parameters.Add("@Request", SqlDbType.Xml).Value = new SqlXml(xmlReader);
+            var replyParameter = cmd.Parameters.Add("@Reply", SqlDbType.Xml);
             replyParameter.Direction = ParameterDirection.Output;
 
             cmd.ExecuteNonQuery();
@@ -83,11 +86,13 @@ namespace SQLIO2.Middlewares
 
             if (!replyValue.IsNull)
             {
-                var reply = (byte[])replyParameter.Value;
+                using var reader = replyValue.CreateReader();
+                var msg = new XmlDocument();
+                msg.Load(reader);
 
                 var stream = packet.Client.GetStream();
 
-                await stream.WriteAsync(reply);
+                await stream.WriteAsync(Encoding.UTF8.GetBytes(msg.OuterXml));
                 await stream.FlushAsync();
             }
         }

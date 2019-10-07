@@ -41,7 +41,7 @@ namespace SQLIO2.Protocols
             var msg = new XmlDocument();
             msg.LoadXml(Encoding.UTF8.GetString(xml.ToArray()));
 
-            //RunStack(client, xml);
+            RunStack(client, msg);
         }
 
         protected void RunStack(TcpClient client, XmlDocument xml)
@@ -52,11 +52,11 @@ namespace SQLIO2.Protocols
                 {
                     using (var scope = _serviceScopeFactory.CreateScope())
                     {
-                        //var packet = new Packet(scope.ServiceProvider, client, xmlBytes);
+                        var packet = new Packet(scope.ServiceProvider, client, xml);
 
-                        //_logger.LogInformation("Handling packet {Xml} from {RemoteEndpoint}", xml, client.Client.RemoteEndPoint);
+                        _logger.LogInformation("Handling packet {Xml} from {RemoteEndpoint}", xml.OuterXml, client.Client.RemoteEndPoint);
 
-                        //await _stack(packet);
+                        await _stack(packet);
                     }
                 }
                 catch (Exception e)
