@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System;
 using System.Data;
 using System.Data.SqlClient;
 using System.Data.SqlTypes;
@@ -13,19 +14,26 @@ namespace SQLIO2.Middlewares
     class SqlServerMiddleware : IMiddleware
     {
         private readonly RequestDelegate _next;
-        private readonly IOptions<SqlServerOptions> _options;
+        private readonly SqlServerOptions _options;
         private readonly ILogger<SqlServerMiddleware> _logger;
 
         public SqlServerMiddleware(RequestDelegate next, IOptions<SqlServerOptions> options, ILogger<SqlServerMiddleware> logger)
         {
             _next = next;
-            _options = options;
+            _options = options.Value;
             _logger = logger;
+
+            logger.LogInformation("Using connection string '{ConnectionString}'", _options.ConnectionString);
+
+            if (string.IsNullOrEmpty(_options.ConnectionString))
+            {
+                throw new InvalidOperationException("Invalid connection string");
+            }
         }
 
         public async Task HandleAsync(Packet packet)
         {
-            using var connection = new SqlConnection(_options.Value.ConnectionString);
+            using var connection = new SqlConnection(_options.ConnectionString);
             var wasOpen = connection.State == ConnectionState.Open;
 
             if (!wasOpen)
@@ -70,7 +78,7 @@ namespace SQLIO2.Middlewares
             var local = GetEndpoint(packet.Client.Client.LocalEndPoint);
             var remote = GetEndpoint(packet.Client.Client.RemoteEndPoint);
 
-            using var cmd = new SqlCommand(_options.Value.XmlStoredProcedureName, connection)
+            using var cmd = new SqlCommand(_options.XmlStoredProcedureName, connection)
             {
                 CommandType = CommandType.StoredProcedure
             };
@@ -110,7 +118,7 @@ namespace SQLIO2.Middlewares
             var local = GetEndpoint(packet.Client.Client.LocalEndPoint);
             var remote = GetEndpoint(packet.Client.Client.RemoteEndPoint);
 
-            using var cmd = new SqlCommand(_options.Value.StoredProcedureName, connection)
+            using var cmd = new SqlCommand(_options.StoredProcedureName, connection)
             {
                 CommandType = CommandType.StoredProcedure
             };

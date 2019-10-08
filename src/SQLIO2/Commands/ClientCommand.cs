@@ -116,7 +116,7 @@ namespace SQLIO2
 
         private byte[] GetDataBytes()
         {
-            if (ProtocolName.Equals("sc500", StringComparison.OrdinalIgnoreCase))
+            if (ProtocolName?.Equals("sc500", StringComparison.OrdinalIgnoreCase) == true)
             {
                 return Encoding.UTF8.GetBytes(DataHexOrXml);
             }
