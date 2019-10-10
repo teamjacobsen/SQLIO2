@@ -24,11 +24,6 @@ namespace SQLIO2.Middlewares
             _logger = logger;
 
             logger.LogInformation("Using connection string '{ConnectionString}'", _options.ConnectionString);
-
-            if (string.IsNullOrEmpty(_options.ConnectionString))
-            {
-                throw new InvalidOperationException("Invalid connection string");
-            }
         }
 
         public async Task HandleAsync(Packet packet)
