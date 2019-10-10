@@ -68,7 +68,7 @@ namespace SQLIO2
                     {
                         services
                             .AddSingleton<ChatHub>()
-                            .AddHostedService<RemoteConnection>();
+                            .AddHostedService<ChatConnection>();
 
                         if (ChatPort != null)
                         {
