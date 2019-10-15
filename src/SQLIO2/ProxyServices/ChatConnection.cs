@@ -35,13 +35,15 @@ namespace SQLIO2.ProxyServices
             {
                 try
                 {
-                    using (_chatHub.RemoteClient = new TcpClient())
+                    using (var remoteClient = _chatHub.RemoteClient = new TcpClient())
                     {
                         try
                         {
-                            await _chatHub.RemoteClient.ConnectAsync(_options.RemoteHost, _options.RemotePort);
+                            _logger.LogInformation("Connecting to device on {RemoteHost}:{RemotePort}", _options.RemoteHost, _options.RemotePort);
 
-                            _logger.LogInformation("Connected to device on {RemoteClientRemoteEndpoint}", _chatHub.RemoteClient.Client.RemoteEndPoint);
+                            await remoteClient.ConnectAsync(_options.RemoteHost, _options.RemotePort);
+
+                            _logger.LogInformation("Connected to device on {RemoteClientRemoteEndpoint}", remoteClient.Client.RemoteEndPoint);
 
                             var stackBuilder = new StackBuilder(_services);
 
@@ -64,19 +66,23 @@ namespace SQLIO2.ProxyServices
                             var protocol = _protocolFactory.Create(_options.ProtocolName, stack);
 
                             await protocol(_chatHub.RemoteClient);
+
+                            _logger.LogInformation("Connection to device on {RemoteClientRemoteEndpoint} was closed", remoteClient.Client.RemoteEndPoint);
                         }
                         catch (SocketException e) when (e.SocketErrorCode == SocketError.ConnectionRefused)
                         {
                             // Unable to connect to server
+
+                            _logger.LogWarning("Unable to connect to device server, retrying in one second");
 
                             // Retry in a second
                             await Task.Delay(1000, stoppingToken);
                         }
                         finally
                         {
-                            if (_chatHub.RemoteClient.Connected)
+                            if (remoteClient.Connected)
                             {
-                                _chatHub.RemoteClient.Client.Disconnect(reuseSocket: true);
+                                remoteClient.Client.Disconnect(reuseSocket: true);
                             }
                         }
                     }

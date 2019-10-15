@@ -24,7 +24,11 @@ namespace SQLIO2.ProxyServices
         {
             var client = ChatClient;
 
-            if (client is object && !await TryWriteAsync(client, data, cancellationToken))
+            if (client is null)
+            {
+                _logger.LogWarning("There is no chat client");
+            }
+            else if (!await TryWriteAsync(client, data, cancellationToken))
             {
                 lock (this)
                 {
@@ -44,7 +48,11 @@ namespace SQLIO2.ProxyServices
         {
             var client = RemoteClient;
 
-            if (client is object && !await TryWriteAsync(client, data, cancellationToken))
+            if (client is null)
+            {
+                _logger.LogWarning("There is no remote client");
+            }
+            else if (!await TryWriteAsync(client, data, cancellationToken))
             {
                 lock (this)
                 {
@@ -64,6 +72,7 @@ namespace SQLIO2.ProxyServices
         {
             if (!client.Connected)
             {
+                _logger.LogWarning("Client is disconnected");
                 return false;
             }
 
@@ -78,12 +87,14 @@ namespace SQLIO2.ProxyServices
 
                 return true;
             }
-            catch (IOException)
+            catch (IOException e)
             {
+                _logger.LogWarning(e.Message);
                 return false;
             }
-            catch (SocketException)
+            catch (SocketException e)
             {
+                _logger.LogWarning(e.Message);
                 return false;
             }
             catch (ObjectDisposedException)

@@ -47,8 +47,15 @@ namespace SQLIO2.Protocols
         {
             var raw = xml.ToArray();
             var msg = new XmlDocument();
-            msg.LoadXml(Encoding.UTF8.GetString(raw));
-
+            try
+            {
+                msg.LoadXml(Encoding.UTF8.GetString(raw));
+            }
+            catch (XmlException)
+            {
+                _logger.LogError("Got invalid xml");
+                return;
+            }
             RunStack(client, raw, msg);
         }
 

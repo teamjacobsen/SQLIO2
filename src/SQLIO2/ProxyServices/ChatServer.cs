@@ -47,7 +47,7 @@ namespace SQLIO2.ProxyServices
                     _logger.LogInformation("Accepting chat client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
                     // Only one chat client can be connected at a time
-                    await AcceptAsync(client, stoppingToken);
+                    await Task.Run(() => AcceptAsync(client, stoppingToken));
                 }
                 catch (ObjectDisposedException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -67,6 +67,8 @@ namespace SQLIO2.ProxyServices
             using var stream = client.GetStream();
             var reader = PipeReader.Create(stream);
 
+            _logger.LogInformation("Waiting for chat client to send data");
+
             while (true)
             {
                 var result = await reader.ReadAsync();
@@ -76,9 +78,14 @@ namespace SQLIO2.ProxyServices
                     break;
                 }
 
+                _logger.LogDebug("Received {BufferLength} bytes", result.Buffer.Length);
+
                 foreach (var segment in result.Buffer)
                 {
-                    await _chatHub.TryWriteRemoteAsync(segment, cancellationToken);
+                    if (!await _chatHub.TryWriteRemoteAsync(segment, cancellationToken))
+                    {
+                        _logger.LogWarning("Unable to forward {SegmentLength} bytes", segment.Length);
+                    }
                 }
 
                 reader.AdvanceTo(result.Buffer.End);

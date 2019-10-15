@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using SQLIO2.Protocols;
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Net;
@@ -39,68 +40,94 @@ namespace SQLIO2
 
         public async Task<int> HandleAsync()
         {
+            var services = new ServiceCollection()
+                .AddLogging(options =>
+                {
+                    if (Verbose)
+                    {
+                        options.AddConsole();
+                    }
+                })
+                .Replace(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(TimedLogger<>)))
+                .AddSingleton<ProtocolFactory>()
+                .BuildServiceProvider();
+            var logger = services.GetRequiredService<ILogger<ClientCommand>>();
+
             using (var client = new TcpClient())
             {
+                var stopwatch = Stopwatch.StartNew();
                 if (Host != null)
                 {
-                    await client.ConnectAsync(Host, Port);
+                    // https://github.com/dotnet/corefx/issues/41588
+                    if (Host == "localhost")
+                    {
+                        await client.ConnectAsync(IPAddress.Loopback, Port);
+                    }
+                    else
+                    {
+                        await client.ConnectAsync(Host, Port);
+                    }
                 }
                 else
                 {
                     await client.ConnectAsync(IPAddress.Loopback, Port);
                 }
 
+                logger.LogInformation("Connected in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+
                 try
                 {
+                    TaskCompletionSource<Packet> tcs = null;
+
+                    if (TimeoutMs != null)
+                    {
+                        var protocolFactory = services.GetRequiredService<ProtocolFactory>();
+
+                        tcs = new TaskCompletionSource<Packet>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                        var protocol = protocolFactory.Create(ProtocolName, packet =>
+                        {
+                            tcs.SetResult(packet);
+
+                            return Task.CompletedTask;
+                        });
+
+                        _ = Task.Run(() => protocol(client));
+                    }
+
                     var stream = client.GetStream();
 
                     if (Filename is object)
                     {
                         using var file = File.OpenRead(Filename);
                         await file.CopyToAsync(stream);
+                        await stream.FlushAsync();
                     }
                     else
                     {
                         var data = GetDataBytes();
 
                         await stream.WriteAsync(data);
+                        await stream.FlushAsync();
                     }
 
-                    await stream.FlushAsync();
+                    stopwatch.Restart();
 
                     if (TimeoutMs != null)
                     {
-                        var services = new ServiceCollection()
-                            .AddLogging(options =>
-                            {
-                                if (Verbose)
-                                {
-                                    options.AddConsole();
-                                }
-                            })
-                            .Replace(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(TimedLogger<>)))
-                            .AddSingleton<ProtocolFactory>()
-                            .BuildServiceProvider();
-
-                        var protocolFactory = services.GetRequiredService<ProtocolFactory>();
-
-                        var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-                        var protocol = protocolFactory.Create(ProtocolName, packet =>
-                        {
-                            Console.WriteLine(packet.ToString());
-
-                            tcs.SetResult(null);
-
-                            return Task.CompletedTask;
-                        });
-
-                        _ = Task.Run(() => protocol(client));
-
                         await Task.WhenAny(tcs.Task, Task.Delay(TimeoutMs.Value));
 
-                        if (!tcs.Task.IsCompleted)
+                        if (tcs.Task.IsCompleted)
                         {
+                            var replyTask = tcs.Task;
+                            var reply = await replyTask;
+                            logger.LogInformation("Got reply after {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+
+                            Console.WriteLine(reply.ToString());
+                        }
+                        else
+                        {
+                            logger.LogWarning("No reply received");
                             return 1;
                         }
                     }
