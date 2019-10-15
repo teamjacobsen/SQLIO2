@@ -42,11 +42,11 @@ namespace SQLIO2.ProxyServices
             {
                 try
                 {
-                    var client = await _listener.AcceptTcpClientAsync().ConfigureAwait(false);
+                    var client = await _listener.AcceptTcpClientAsync();
 
                     _logger.LogInformation("Accepting fanout client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
-                    _ = Task.Run(() => AcceptAsync(client, stoppingToken));
+                    _ = Task.Run(() => AcceptAsync(client, stoppingToken), stoppingToken);
                 }
                 catch (ObjectDisposedException) when (stoppingToken.IsCancellationRequested)
                 {

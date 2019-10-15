@@ -3,6 +3,7 @@ using System;
 using System.Buffers;
 using System.IO.Pipelines;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SQLIO2.Protocols
@@ -16,16 +17,16 @@ namespace SQLIO2.Protocols
             _logger = logger;
         }
 
-        public Task ProcessAsync(TcpClient client)
+        public Task ProcessAsync(TcpClient client, CancellationToken cancellationToken)
         {
             var pipe = new Pipe();
-            var writingTask = FillPipeAsync(client.Client, pipe.Writer);
-            var readingTask = ReadPipeAsync(client, pipe.Reader);
+            var writingTask = FillPipeAsync(client.Client, pipe.Writer, cancellationToken);
+            var readingTask = ReadPipeAsync(client, pipe.Reader, cancellationToken);
 
             return Task.WhenAll(readingTask, writingTask);
         }
 
-        private async Task FillPipeAsync(Socket socket, PipeWriter writer)
+        private async Task FillPipeAsync(Socket socket, PipeWriter writer, CancellationToken cancellationToken)
         {
             const int minimumBufferSize = 512;
 
@@ -36,7 +37,7 @@ namespace SQLIO2.Protocols
 
                 try
                 {
-                    var bytesRead = await socket.ReceiveAsync(memory, SocketFlags.None);
+                    var bytesRead = await socket.ReceiveAsync(memory, SocketFlags.None, cancellationToken);
 
                     if (bytesRead == 0)
                     {
@@ -68,11 +69,11 @@ namespace SQLIO2.Protocols
             _logger.LogInformation("Client {RemoteEndpoint} was disconnected", socket.RemoteEndPoint);
         }
 
-        private async Task ReadPipeAsync(TcpClient client, PipeReader reader)
+        private async Task ReadPipeAsync(TcpClient client, PipeReader reader, CancellationToken cancellationToken)
         {
             while (true)
             {
-                var result = await reader.ReadAsync();
+                var result = await reader.ReadAsync(cancellationToken);
                 var buffer = result.Buffer;
                 var position = Read(client, buffer);
 

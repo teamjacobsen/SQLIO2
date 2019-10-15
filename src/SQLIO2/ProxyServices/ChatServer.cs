@@ -42,12 +42,12 @@ namespace SQLIO2.ProxyServices
             {
                 try
                 {
-                    var client = await _listener.AcceptTcpClientAsync().ConfigureAwait(false);
+                    var client = await _listener.AcceptTcpClientAsync();
 
                     _logger.LogInformation("Accepting chat client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
                     // Only one chat client can be connected at a time
-                    await AcceptAsync(client, stoppingToken).ConfigureAwait(false);
+                    await AcceptAsync(client, stoppingToken);
                 }
                 catch (ObjectDisposedException) when (stoppingToken.IsCancellationRequested)
                 {

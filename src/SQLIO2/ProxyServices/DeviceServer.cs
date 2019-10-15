@@ -16,7 +16,7 @@ namespace SQLIO2.ProxyServices
         private readonly FanoutHub _fanoutHub;
         private readonly ProxyOptions _options;
         private readonly ILogger<DeviceServer> _logger;
-        private readonly Func<TcpClient, Task> _protocol;
+        private readonly Func<TcpClient, CancellationToken, Task> _protocol;
         private TcpListener _listener;
 
         public DeviceServer(ProtocolFactory protocolFactory, IServiceProvider services, FanoutHub fanoutHub, IOptions<ProxyOptions> options, IOptions<SqlServerOptions> sqlOptions, ILogger<DeviceServer> logger)
@@ -55,11 +55,11 @@ namespace SQLIO2.ProxyServices
             {
                 try
                 {
-                    var client = await _listener.AcceptTcpClientAsync().ConfigureAwait(false);
+                    var client = await _listener.AcceptTcpClientAsync();
 
                     _logger.LogInformation("Accepting device client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
-                    _ = Task.Run(() => AcceptAsync(client));
+                    _ = Task.Run(() => AcceptAsync(client, stoppingToken), stoppingToken);
                 }
                 catch (ObjectDisposedException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -69,14 +69,14 @@ namespace SQLIO2.ProxyServices
             _logger.LogInformation("Stopping device server");
         }
 
-        private Task AcceptAsync(TcpClient client)
+        private Task AcceptAsync(TcpClient client, CancellationToken cancellationToken)
         {
             if (_fanoutHub.TryRegister(client))
             {
                 _logger.LogInformation("Registered connected device {RemoteEndpoint} for fanout through proxy", client.Client.RemoteEndPoint);
             }
 
-            return _protocol(client);
+            return _protocol(client, cancellationToken);
         }
     }
 }

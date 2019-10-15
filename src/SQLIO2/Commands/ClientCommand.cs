@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SQLIO2.Protocols;
 using System;
@@ -51,6 +52,7 @@ namespace SQLIO2
                 .Replace(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(TimedLogger<>)))
                 .AddSingleton<ProtocolFactory>()
                 .BuildServiceProvider();
+            var lifetime = services.GetRequiredService<IHostApplicationLifetime>();
             var logger = services.GetRequiredService<ILogger<ClientCommand>>();
 
             using (var client = new TcpClient())
@@ -61,16 +63,16 @@ namespace SQLIO2
                     // https://github.com/dotnet/corefx/issues/41588
                     if (Host == "localhost")
                     {
-                        await client.ConnectAsync(IPAddress.Loopback, Port).ConfigureAwait(false);
+                        await client.ConnectAsync(IPAddress.Loopback, Port);
                     }
                     else
                     {
-                        await client.ConnectAsync(Host, Port).ConfigureAwait(false);
+                        await client.ConnectAsync(Host, Port);
                     }
                 }
                 else
                 {
-                    await client.ConnectAsync(IPAddress.Loopback, Port).ConfigureAwait(false);
+                    await client.ConnectAsync(IPAddress.Loopback, Port);
                 }
 
                 logger.LogInformation("Connected in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
@@ -92,7 +94,7 @@ namespace SQLIO2
                             return Task.CompletedTask;
                         });
 
-                        _ = Task.Run(() => protocol(client));
+                        _ = Task.Run(() => protocol(client, lifetime.ApplicationStopping), lifetime.ApplicationStopping);
                     }
 
                     var stream = client.GetStream();

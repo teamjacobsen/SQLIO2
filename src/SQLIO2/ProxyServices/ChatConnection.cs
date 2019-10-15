@@ -41,7 +41,7 @@ namespace SQLIO2.ProxyServices
                         {
                             _logger.LogInformation("Connecting to device on {RemoteHost}:{RemotePort}", _options.RemoteHost, _options.RemotePort);
 
-                            await remoteClient.ConnectAsync(_options.RemoteHost, _options.RemotePort).ConfigureAwait(false);
+                            await remoteClient.ConnectAsync(_options.RemoteHost, _options.RemotePort);
 
                             _logger.LogInformation("Connected to device on {RemoteClientRemoteEndpoint}", remoteClient.Client.RemoteEndPoint);
 
@@ -65,7 +65,7 @@ namespace SQLIO2.ProxyServices
 
                             var protocol = _protocolFactory.Create(_options.ProtocolName, stack);
 
-                            await protocol(_chatHub.RemoteClient).ConfigureAwait(false);
+                            await protocol(_chatHub.RemoteClient, stoppingToken);
 
                             _logger.LogInformation("Connection to device on {RemoteClientRemoteEndpoint} was closed", remoteClient.Client.RemoteEndPoint);
                         }
@@ -76,13 +76,15 @@ namespace SQLIO2.ProxyServices
                             _logger.LogWarning("Unable to connect to device server, retrying in one second");
 
                             // Retry in a second
-                            await Task.Delay(1000, stoppingToken).ConfigureAwait(false);
+                            await Task.Delay(1000, stoppingToken);
                         }
                         finally
                         {
                             if (remoteClient.Connected)
                             {
                                 remoteClient.Client.Disconnect(reuseSocket: true);
+
+                                _logger.LogWarning("Closed connection to device");
                             }
                         }
                     }

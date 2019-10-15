@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SQLIO2.Protocols
@@ -14,7 +15,7 @@ namespace SQLIO2.Protocols
             _services = services;
         }
 
-        public Func<TcpClient, Task> Create(string name, RequestDelegate stack)
+        public Func<TcpClient, CancellationToken, Task> Create(string name, RequestDelegate stack)
         {
             if (name?.Equals("videojet", StringComparison.OrdinalIgnoreCase) == true)
             {
