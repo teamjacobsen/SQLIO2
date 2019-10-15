@@ -52,7 +52,6 @@ namespace SQLIO2
                 .Replace(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(TimedLogger<>)))
                 .AddSingleton<ProtocolFactory>()
                 .BuildServiceProvider();
-            var lifetime = services.GetRequiredService<IHostApplicationLifetime>();
             var logger = services.GetRequiredService<ILogger<ClientCommand>>();
 
             using (var client = new TcpClient())
@@ -94,7 +93,7 @@ namespace SQLIO2
                             return Task.CompletedTask;
                         });
 
-                        _ = Task.Run(() => protocol(client, lifetime.ApplicationStopping), lifetime.ApplicationStopping);
+                        _ = Task.Run(() => protocol(client, default));
                     }
 
                     var stream = client.GetStream();
