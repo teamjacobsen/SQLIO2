@@ -65,7 +65,7 @@ namespace SQLIO2.ProxyServices
 
                             var protocol = _protocolFactory.Create(_options.ProtocolName, stack);
 
-                            await protocol(_chatHub.RemoteClient, stoppingToken);
+                            await protocol(remoteClient, stoppingToken);
 
                             _logger.LogInformation("Connection to device on {RemoteClientRemoteEndpoint} was closed", remoteClient.Client.RemoteEndPoint);
                         }

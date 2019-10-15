@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -8,8 +9,12 @@ namespace SQLIO2
 {
     class Program
     {
+        public static Stopwatch Started { get; private set; }
+
         static async Task<int> Main(string[] args)
         {
+            Started = Stopwatch.StartNew();
+
             switch (args.FirstOrDefault())
             {
                 case "client":

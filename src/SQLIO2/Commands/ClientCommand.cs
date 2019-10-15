@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SQLIO2.Protocols;
 using System;
@@ -41,18 +40,27 @@ namespace SQLIO2
 
         public async Task<int> HandleAsync()
         {
-            var services = new ServiceCollection()
-                .AddLogging(options =>
-                {
-                    if (Verbose)
-                    {
-                        options.AddConsole();
-                    }
-                })
-                .Replace(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(TimedLogger<>)))
+            var elapsedOnEntering = Program.Started.ElapsedMilliseconds;
+
+            var serviceCollection = new ServiceCollection();
+
+            if (Verbose)
+            {
+                serviceCollection
+                    .AddLogging(options => options.ClearProviders().AddConsole())
+                    .Replace(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(TimedLogger<>)));
+            }
+            else
+            {
+                serviceCollection.AddLogging(options => options.ClearProviders());
+            }
+
+            var services = serviceCollection
                 .AddSingleton<ProtocolFactory>()
                 .BuildServiceProvider();
             var logger = services.GetRequiredService<ILogger<ClientCommand>>();
+
+            logger.LogInformation("Booted after {ElapsedOnEntering}/{ElapsedMilliseconds}ms", elapsedOnEntering, Program.Started.ElapsedMilliseconds);
 
             using (var client = new TcpClient())
             {
@@ -96,6 +104,8 @@ namespace SQLIO2
                         _ = Task.Run(() => protocol(client, default));
                     }
 
+                    stopwatch.Restart();
+
                     var stream = client.GetStream();
 
                     if (Filename is object)
@@ -112,6 +122,8 @@ namespace SQLIO2
                         await stream.FlushAsync();
                     }
 
+                    logger.LogInformation("Sent in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+
                     stopwatch.Restart();
 
                     if (TimeoutMs != null)
@@ -120,9 +132,10 @@ namespace SQLIO2
 
                         if (tcs.Task.IsCompleted)
                         {
+                            logger.LogInformation("Got reply after {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+
                             var replyTask = tcs.Task;
                             var reply = await replyTask;
-                            logger.LogInformation("Got reply after {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
 
                             Console.WriteLine(reply.ToString());
                         }

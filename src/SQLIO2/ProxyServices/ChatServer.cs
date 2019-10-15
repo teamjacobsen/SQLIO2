@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
+using System.IO;
 using System.IO.Pipelines;
 using System.Net;
 using System.Net.Sockets;
@@ -42,7 +43,7 @@ namespace SQLIO2.ProxyServices
             {
                 try
                 {
-                    var client = await _listener.AcceptTcpClientAsync();
+                    var client = await Task.Run(_listener.AcceptTcpClientAsync, stoppingToken);
 
                     _logger.LogInformation("Accepting chat client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
@@ -69,26 +70,37 @@ namespace SQLIO2.ProxyServices
 
             _logger.LogInformation("Waiting for chat client to send data");
 
-            while (true)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                var result = await reader.ReadAsync();
-
-                if (result.IsCompleted || result.Buffer.IsEmpty)
+                try
                 {
+                    var result = await reader.ReadAsync(cancellationToken);
+
+                    if (result.IsCompleted || result.Buffer.IsEmpty)
+                    {
+                        break;
+                    }
+
+                    _logger.LogDebug("Received {BufferLength} bytes", result.Buffer.Length);
+
+                    foreach (var segment in result.Buffer)
+                    {
+                        if (!await _chatHub.TryWriteRemoteAsync(segment, cancellationToken))
+                        {
+                            _logger.LogWarning("Unable to forward {SegmentLength} bytes", segment.Length);
+                        }
+                    }
+
+                    reader.AdvanceTo(result.Buffer.End);
+                }
+                catch (IOException e) when (e.InnerException is SocketException se && se.SocketErrorCode == SocketError.ConnectionReset)
+                {
+                    // Client disconnected
                     break;
                 }
-
-                _logger.LogDebug("Received {BufferLength} bytes", result.Buffer.Length);
-
-                foreach (var segment in result.Buffer)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    if (!await _chatHub.TryWriteRemoteAsync(segment, cancellationToken))
-                    {
-                        _logger.LogWarning("Unable to forward {SegmentLength} bytes", segment.Length);
-                    }
                 }
-
-                reader.AdvanceTo(result.Buffer.End);
             }
 
             _logger.LogInformation("Chat client {RemoteEndpoint} was disconnected", client.Client.RemoteEndPoint);

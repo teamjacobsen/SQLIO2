@@ -55,7 +55,7 @@ namespace SQLIO2.ProxyServices
             {
                 try
                 {
-                    var client = await _listener.AcceptTcpClientAsync();
+                    var client = await Task.Run(_listener.AcceptTcpClientAsync, stoppingToken);
 
                     _logger.LogInformation("Accepting device client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 

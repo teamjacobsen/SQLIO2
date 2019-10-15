@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
+using System.IO;
 using System.IO.Pipelines;
 using System.Net;
 using System.Net.Sockets;
@@ -42,7 +43,7 @@ namespace SQLIO2.ProxyServices
             {
                 try
                 {
-                    var client = await _listener.AcceptTcpClientAsync();
+                    var client = await Task.Run(_listener.AcceptTcpClientAsync, stoppingToken);
 
                     _logger.LogInformation("Accepting fanout client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
@@ -78,6 +79,11 @@ namespace SQLIO2.ProxyServices
                     }
 
                     reader.AdvanceTo(result.Buffer.End);
+                }
+                catch (IOException e) when (e.InnerException is SocketException se && se.SocketErrorCode == SocketError.ConnectionReset)
+                {
+                    // Client disconnected
+                    break;
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
