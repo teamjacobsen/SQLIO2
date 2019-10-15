@@ -61,16 +61,16 @@ namespace SQLIO2
                     // https://github.com/dotnet/corefx/issues/41588
                     if (Host == "localhost")
                     {
-                        await client.ConnectAsync(IPAddress.Loopback, Port);
+                        await client.ConnectAsync(IPAddress.Loopback, Port).ConfigureAwait(false);
                     }
                     else
                     {
-                        await client.ConnectAsync(Host, Port);
+                        await client.ConnectAsync(Host, Port).ConfigureAwait(false);
                     }
                 }
                 else
                 {
-                    await client.ConnectAsync(IPAddress.Loopback, Port);
+                    await client.ConnectAsync(IPAddress.Loopback, Port).ConfigureAwait(false);
                 }
 
                 logger.LogInformation("Connected in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
