@@ -40,7 +40,6 @@ namespace SQLIO2.ProxyServices
         {
             var listener = new TcpListener(new IPEndPoint(IPAddress.Any, _options.ListenPort));
             listener.Start();
-            stoppingToken.Register(() => listener.Stop());
 
             _logger.LogInformation("Listening for device on {LocalEndpoint}", listener.LocalEndpoint);
 
@@ -48,13 +47,13 @@ namespace SQLIO2.ProxyServices
             {
                 try
                 {
-                    var client = await Task.Run(listener.AcceptTcpClientAsync, stoppingToken);
+                    var client = await listener.AcceptAsync(stoppingToken);
 
                     _logger.LogInformation("Accepting device client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
                     _ = Task.Run(() => AcceptAsync(client, stoppingToken));
                 }
-                catch (ObjectDisposedException) when (stoppingToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
                 }
             }

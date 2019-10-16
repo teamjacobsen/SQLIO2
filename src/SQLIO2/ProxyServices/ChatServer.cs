@@ -28,7 +28,6 @@ namespace SQLIO2.ProxyServices
         {
             var listener = new TcpListener(new IPEndPoint(IPAddress.Loopback, _options.ChatPort));
             listener.Start();
-            stoppingToken.Register(() => listener.Stop());
 
             _logger.LogInformation("Listening for chat on {LocalEndpoint}", listener.LocalEndpoint);
 
@@ -36,15 +35,12 @@ namespace SQLIO2.ProxyServices
             {
                 try
                 {
-                    var client = await Task.Run(listener.AcceptTcpClientAsync, stoppingToken);
+                    var client = await listener.AcceptAsync(stoppingToken);
 
                     _logger.LogInformation("Accepting chat client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
                     // Only one chat client can be connected at a time
                     await AcceptAsync(client, stoppingToken);
-                }
-                catch (ObjectDisposedException) when (stoppingToken.IsCancellationRequested)
-                {
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {

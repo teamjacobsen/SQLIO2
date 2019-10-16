@@ -35,69 +35,62 @@ namespace SQLIO2.ProxyServices
             {
                 try
                 {
-                    using (var remoteClient = new TcpClient())
+                    using var remoteClient = new TcpClient();
+
+                    try
                     {
-                        try
-                        {
-                            _logger.LogInformation("Connecting to device on {RemoteHost}:{RemotePort}", _options.RemoteHost, _options.RemotePort);
+                        _logger.LogInformation("Connecting to device on {RemoteHost}:{RemotePort}", _options.RemoteHost, _options.RemotePort);
 
-                            await remoteClient.ConnectAsync(_options.RemoteHost, _options.RemotePort);
+                        await remoteClient.ConnectAsync(_options.RemoteHost, _options.RemotePort);
 
-                            _logger.LogInformation("Connected to device on {RemoteClientRemoteEndpoint}", remoteClient.Client.RemoteEndPoint);
+                        _logger.LogInformation("Connected to device on {RemoteClientRemoteEndpoint}", remoteClient.Client.RemoteEndPoint);
 
-                            var stackBuilder = new StackBuilder(_services);
+                        _chatHub.RemoteClient = remoteClient;
+                        var stack = CreateStack(stoppingToken);
+                        var protocol = _protocolFactory.Create(_options.ProtocolName, stack);
+                        await protocol(remoteClient, stoppingToken);
 
-                            if (_sqlOptions.ConnectionString != null)
-                            {
-                                stackBuilder.Use<SqlServerMiddleware>();
-                            }
-                            else
-                            {
-                                _logger.LogWarning("No ConnectionString found, disabling SqlServer injection");
-                            }
+                        _logger.LogInformation("Connection to device on {RemoteClientRemoteEndpoint} was closed", remoteClient.Client.RemoteEndPoint);
+                    }
+                    catch (SocketException e) when (e.SocketErrorCode == SocketError.ConnectionRefused)
+                    {
+                        // Unable to connect to server
 
-                            var stack = stackBuilder
-                                .Use(next =>
-                                {
-                                    return async (packet) =>
-                                    {
-                                        await _chatHub.TryWriteChatAsync(packet.Raw, stoppingToken);
-                                        await next(packet);
-                                    };
-                                })
-                                .Build();
+                        _logger.LogWarning("Unable to connect to device server, retrying in one second");
 
-                            var protocol = _protocolFactory.Create(_options.ProtocolName, stack);
-
-                            _chatHub.RemoteClient = remoteClient;
-                            await protocol(remoteClient, stoppingToken);
-
-                            _logger.LogInformation("Connection to device on {RemoteClientRemoteEndpoint} was closed", remoteClient.Client.RemoteEndPoint);
-                        }
-                        catch (SocketException e) when (e.SocketErrorCode == SocketError.ConnectionRefused)
-                        {
-                            // Unable to connect to server
-
-                            _logger.LogWarning("Unable to connect to device server, retrying in one second");
-
-                            // Retry in a second
-                            await Task.Delay(1000, stoppingToken);
-                        }
-                        finally
-                        {
-                            if (remoteClient.Connected)
-                            {
-                                remoteClient.Client.Disconnect(reuseSocket: true);
-
-                                _logger.LogWarning("Closed connection to device");
-                            }
-                        }
+                        // Retry in a second
+                        await Task.Delay(1000, stoppingToken);
                     }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
                 }
             }
+        }
+
+        private RequestDelegate CreateStack(CancellationToken cancellationToken)
+        {
+            var stackBuilder = new StackBuilder(_services);
+
+            if (_sqlOptions.ConnectionString != null)
+            {
+                stackBuilder.Use<SqlServerMiddleware>();
+            }
+            else
+            {
+                _logger.LogWarning("No ConnectionString found, disabling SqlServer injection");
+            }
+
+            return stackBuilder
+                .Use(next =>
+                {
+                    return async (packet) =>
+                    {
+                        await _chatHub.TryWriteChatAsync(packet.Raw, cancellationToken);
+                        await next(packet);
+                    };
+                })
+                .Build();
         }
     }
 }

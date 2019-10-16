@@ -83,70 +83,63 @@ namespace SQLIO2
 
                 logger.LogInformation("Connected in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
 
-                try
+                TaskCompletionSource<Packet> tcs = null;
+
+                if (TimeoutMs != null)
                 {
-                    TaskCompletionSource<Packet> tcs = null;
+                    tcs = new TaskCompletionSource<Packet>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-                    if (TimeoutMs != null)
+                    var protocolFactory = new ProtocolFactory(logger);
+                    var protocol = protocolFactory.Create(ProtocolName, packet =>
                     {
-                        tcs = new TaskCompletionSource<Packet>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        tcs.SetResult(packet);
 
-                        var protocolFactory = new ProtocolFactory(logger);
-                        var protocol = protocolFactory.Create(ProtocolName, packet =>
-                        {
-                            tcs.SetResult(packet);
+                        return Task.CompletedTask;
+                    });
 
-                            return Task.CompletedTask;
-                        });
+                    _ = Task.Run(() => protocol(client, default));
+                }
 
-                        _ = Task.Run(() => protocol(client, default));
-                    }
+                stopwatch.Restart();
 
-                    stopwatch.Restart();
+                var stream = client.GetStream();
 
-                    var stream = client.GetStream();
+                if (Filename is object)
+                {
+                    using var file = File.OpenRead(Filename);
+                    await file.CopyToAsync(stream);
+                    await stream.FlushAsync();
+                }
+                else
+                {
+                    var data = GetDataBytes();
 
-                    if (Filename is object)
+                    await stream.WriteAsync(data);
+                    await stream.FlushAsync();
+                }
+
+                logger.LogInformation("Sent in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+
+                stopwatch.Restart();
+
+                if (TimeoutMs != null)
+                {
+                    await Task.WhenAny(tcs.Task, Task.Delay(TimeoutMs.Value));
+
+                    if (tcs.Task.IsCompleted)
                     {
-                        using var file = File.OpenRead(Filename);
-                        await file.CopyToAsync(stream);
-                        await stream.FlushAsync();
+                        logger.LogInformation("Got reply after {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+
+                        var replyTask = tcs.Task;
+                        var reply = await replyTask;
+
+                        Console.WriteLine(reply.ToString());
                     }
                     else
                     {
-                        var data = GetDataBytes();
-
-                        await stream.WriteAsync(data);
-                        await stream.FlushAsync();
+                        logger.LogWarning("No reply received");
+                        return 1;
                     }
-
-                    logger.LogInformation("Sent in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
-
-                    stopwatch.Restart();
-
-                    if (TimeoutMs != null)
-                    {
-                        await Task.WhenAny(tcs.Task, Task.Delay(TimeoutMs.Value));
-
-                        if (tcs.Task.IsCompleted)
-                        {
-                            logger.LogInformation("Got reply after {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
-
-                            var replyTask = tcs.Task;
-                            var reply = await replyTask;
-
-                            Console.WriteLine(reply.ToString());
-                        }
-                        else
-                        {
-                            logger.LogWarning("No reply received");
-                            return 1;
-                        }
-                    }
-                }
-                finally
-                {
-                    client.Client.Disconnect(reuseSocket: false);
                 }
             }
 

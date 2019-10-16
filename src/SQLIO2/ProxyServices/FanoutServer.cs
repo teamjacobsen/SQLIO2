@@ -28,7 +28,6 @@ namespace SQLIO2.ProxyServices
         {
             var listener = new TcpListener(new IPEndPoint(IPAddress.Loopback, _options.FanoutPort));
             listener.Start();
-            stoppingToken.Register(() => listener.Stop());
             
             _logger.LogInformation("Listening for fanout on {LocalEndpoint}", listener.LocalEndpoint);
 
@@ -36,14 +35,11 @@ namespace SQLIO2.ProxyServices
             {
                 try
                 {
-                    var client = await Task.Run(listener.AcceptTcpClientAsync, stoppingToken);
+                    var client = await listener.AcceptAsync(stoppingToken);
 
                     _logger.LogInformation("Accepting fanout client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
                     _ = Task.Run(() => AcceptAsync(client, stoppingToken));
-                }
-                catch (ObjectDisposedException) when (stoppingToken.IsCancellationRequested)
-                {
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
