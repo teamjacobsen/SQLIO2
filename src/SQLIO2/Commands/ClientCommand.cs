@@ -24,7 +24,7 @@ namespace SQLIO2
         public int Port { get; set; }
 
         [Argument(0)]
-        public string DataHexOrXml { get; set; }
+        public string DataHexOrXml { get; set; } = string.Empty;
 
         [Option("-f|--filename")]
         public string Filename { get; set; }
@@ -63,83 +63,91 @@ namespace SQLIO2
 
             using (var client = new TcpClient())
             {
-                var stopwatch = Stopwatch.StartNew();
-                if (Host != null)
+                try
                 {
-                    // https://github.com/dotnet/corefx/issues/41588
-                    if (Host == "localhost")
+                    var stopwatch = Stopwatch.StartNew();
+                    if (Host != null)
+                    {
+                        // https://github.com/dotnet/corefx/issues/41588
+                        if (Host == "localhost")
+                        {
+                            await client.ConnectAsync(IPAddress.Loopback, Port);
+                        }
+                        else
+                        {
+                            await client.ConnectAsync(Host, Port);
+                        }
+                    }
+                    else
                     {
                         await client.ConnectAsync(IPAddress.Loopback, Port);
                     }
-                    else
+
+                    logger.LogInformation("Connected in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+
+                    TaskCompletionSource<Packet> tcs = null;
+
+                    if (TimeoutMs != null)
                     {
-                        await client.ConnectAsync(Host, Port);
+                        tcs = new TaskCompletionSource<Packet>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                        var protocolFactory = new ProtocolFactory(logger);
+                        var protocol = protocolFactory.Create(ProtocolName, packet =>
+                        {
+                            tcs.SetResult(packet);
+
+                            return Task.CompletedTask;
+                        });
+
+                        _ = Task.Run(() => protocol(client, default));
                     }
-                }
-                else
-                {
-                    await client.ConnectAsync(IPAddress.Loopback, Port);
-                }
 
-                logger.LogInformation("Connected in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+                    stopwatch.Restart();
 
-                TaskCompletionSource<Packet> tcs = null;
+                    var stream = client.GetStream();
 
-                if (TimeoutMs != null)
-                {
-                    tcs = new TaskCompletionSource<Packet>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-                    var protocolFactory = new ProtocolFactory(logger);
-                    var protocol = protocolFactory.Create(ProtocolName, packet =>
+                    if (Filename is object)
                     {
-                        tcs.SetResult(packet);
-
-                        return Task.CompletedTask;
-                    });
-
-                    _ = Task.Run(() => protocol(client, default));
-                }
-
-                stopwatch.Restart();
-
-                var stream = client.GetStream();
-
-                if (Filename is object)
-                {
-                    using var file = File.OpenRead(Filename);
-                    await file.CopyToAsync(stream);
-                    await stream.FlushAsync();
-                }
-                else
-                {
-                    var data = GetDataBytes();
-
-                    await stream.WriteAsync(data);
-                    await stream.FlushAsync();
-                }
-
-                logger.LogInformation("Sent in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
-
-                stopwatch.Restart();
-
-                if (TimeoutMs != null)
-                {
-                    await Task.WhenAny(tcs.Task, Task.Delay(TimeoutMs.Value));
-
-                    if (tcs.Task.IsCompleted)
-                    {
-                        logger.LogInformation("Got reply after {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
-
-                        var replyTask = tcs.Task;
-                        var reply = await replyTask;
-
-                        Console.WriteLine(reply.ToString());
+                        using var file = File.OpenRead(Filename);
+                        await file.CopyToAsync(stream);
+                        await stream.FlushAsync();
                     }
                     else
                     {
-                        logger.LogWarning("No reply received");
-                        return 1;
+                        var data = GetDataBytes();
+
+                        await stream.WriteAsync(data);
+                        await stream.FlushAsync();
                     }
+
+                    logger.LogInformation("Sent in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+
+                    stopwatch.Restart();
+
+                    if (TimeoutMs != null)
+                    {
+                        await Task.WhenAny(tcs.Task, Task.Delay(TimeoutMs.Value));
+
+                        if (tcs.Task.IsCompleted)
+                        {
+                            logger.LogInformation("Got reply after {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+
+                            var replyTask = tcs.Task;
+                            var reply = await replyTask;
+
+                            Console.WriteLine(reply.ToString());
+                        }
+                        else
+                        {
+                            logger.LogWarning("No reply received");
+                            return 1;
+                        }
+                    }
+                }
+                catch (SocketException e) when (e.SocketErrorCode == SocketError.ConnectionRefused)
+                {
+                    logger.LogError("Unable to connect");
+                    return 2;
                 }
             }
 
