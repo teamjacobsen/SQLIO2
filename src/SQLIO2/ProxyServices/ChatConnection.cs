@@ -35,7 +35,7 @@ namespace SQLIO2.ProxyServices
             {
                 try
                 {
-                    using (var remoteClient = _chatHub.RemoteClient = new TcpClient())
+                    using (var remoteClient = new TcpClient())
                     {
                         try
                         {
@@ -51,6 +51,10 @@ namespace SQLIO2.ProxyServices
                             {
                                 stackBuilder.Use<SqlServerMiddleware>();
                             }
+                            else
+                            {
+                                _logger.LogWarning("No ConnectionString found, disabling SqlServer injection");
+                            }
 
                             var stack = stackBuilder
                                 .Use(next =>
@@ -65,6 +69,7 @@ namespace SQLIO2.ProxyServices
 
                             var protocol = _protocolFactory.Create(_options.ProtocolName, stack);
 
+                            _chatHub.RemoteClient = remoteClient;
                             await protocol(remoteClient, stoppingToken);
 
                             _logger.LogInformation("Connection to device on {RemoteClientRemoteEndpoint} was closed", remoteClient.Client.RemoteEndPoint);
