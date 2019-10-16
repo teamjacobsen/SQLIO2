@@ -9,8 +9,8 @@ namespace SQLIO2.Protocols
     {
         private const byte StartByte = (byte)'@';
 
-        public DefaultProtocol(RequestDelegate next, IServiceScopeFactory serviceScopeFactory, ILogger<DefaultProtocol> logger)
-            : base(next, serviceScopeFactory, logger)
+        public DefaultProtocol(RequestDelegate next, ILogger logger)
+            : base(next, logger)
         {
         }
 

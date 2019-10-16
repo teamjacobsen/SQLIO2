@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Buffers;
 using System.Net.Sockets;
@@ -17,13 +16,11 @@ namespace SQLIO2.Protocols
         };
 
         private readonly RequestDelegate _stack;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger _logger;
 
-        public LineBasedProtocol(RequestDelegate stack, IServiceScopeFactory serviceScopeFactory, ILogger logger) : base(logger)
+        public LineBasedProtocol(RequestDelegate stack, ILogger logger) : base(logger)
         {
             _stack = stack;
-            _serviceScopeFactory = serviceScopeFactory;
             _logger = logger;
         }
 
@@ -49,14 +46,11 @@ namespace SQLIO2.Protocols
             {
                 try
                 {
-                    using (var scope = _serviceScopeFactory.CreateScope())
-                    {
-                        var packet = new Packet(scope.ServiceProvider, client, data);
+                    var packet = new Packet(client, data);
 
-                        _logger.LogInformation("Handling packet {DataAscii} from {RemoteEndpoint}", Encoding.ASCII.GetString(data).Replace("\r", "\\r").Replace("\n", "\\n"), client.Client.RemoteEndPoint);
+                    _logger.LogInformation("Handling packet {DataAscii} from {RemoteEndpoint}", Encoding.ASCII.GetString(data).Replace("\r", "\\r").Replace("\n", "\\n"), client.Client.RemoteEndPoint);
 
-                        await _stack(packet);
-                    }
+                    await _stack(packet);
                 }
                 catch (Exception e)
                 {

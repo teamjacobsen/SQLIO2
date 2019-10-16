@@ -7,21 +7,18 @@ namespace SQLIO2
 {
     class Packet
     {
-        public IServiceProvider ServiceProvider { get; }
         public TcpClient Client { get; }
         public byte[] Raw { get; }
         public XmlDocument Xml { get; }
 
-        public Packet(IServiceProvider serviceProvider, TcpClient client, byte[] raw)
+        public Packet(TcpClient client, byte[] raw)
         {
-            ServiceProvider = serviceProvider;
             Client = client;
             Raw = raw;
         }
 
-        public Packet(IServiceProvider serviceProvider, TcpClient client, byte[] raw, XmlDocument xml)
+        public Packet(TcpClient client, byte[] raw, XmlDocument xml)
         {
-            ServiceProvider = serviceProvider;
             Client = client;
             Raw = raw;
             Xml = xml;

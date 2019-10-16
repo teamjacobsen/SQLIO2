@@ -42,23 +42,22 @@ namespace SQLIO2
         {
             var elapsedOnEntering = Program.Started.ElapsedMilliseconds;
 
-            var serviceCollection = new ServiceCollection();
+            ILogger logger;
 
             if (Verbose)
             {
-                serviceCollection
+                var services = new ServiceCollection()
                     .AddLogging(options => options.ClearProviders().AddConsole())
-                    .Replace(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(TimedLogger<>)));
+                    .Replace(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(TimedLogger<>)))
+                    .AddSingleton<ProtocolFactory>()
+                    .BuildServiceProvider();
+
+                logger = services.GetRequiredService<ILogger<ClientCommand>>();
             }
             else
             {
-                serviceCollection.AddLogging(options => options.ClearProviders());
+                logger = new FakeLogger();
             }
-
-            var services = serviceCollection
-                .AddSingleton<ProtocolFactory>()
-                .BuildServiceProvider();
-            var logger = services.GetRequiredService<ILogger<ClientCommand>>();
 
             logger.LogInformation("Booted after {ElapsedOnEntering}/{ElapsedMilliseconds}ms", elapsedOnEntering, Program.Started.ElapsedMilliseconds);
 
@@ -90,10 +89,9 @@ namespace SQLIO2
 
                     if (TimeoutMs != null)
                     {
-                        var protocolFactory = services.GetRequiredService<ProtocolFactory>();
-
                         tcs = new TaskCompletionSource<Packet>(TaskCreationOptions.RunContinuationsAsynchronously);
 
+                        var protocolFactory = new ProtocolFactory(logger);
                         var protocol = protocolFactory.Create(ProtocolName, packet =>
                         {
                             tcs.SetResult(packet);

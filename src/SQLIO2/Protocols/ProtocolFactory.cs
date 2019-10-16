@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Net.Sockets;
 using System.Threading;
@@ -8,26 +9,31 @@ namespace SQLIO2.Protocols
 {
     class ProtocolFactory
     {
-        private readonly IServiceProvider _services;
+        private readonly ILogger _logger;
 
-        public ProtocolFactory(IServiceProvider services)
+        public ProtocolFactory(ILogger logger)
         {
-            _services = services;
+            _logger = logger;
+        }
+
+        public ProtocolFactory(ILogger<ProtocolFactory> logger)
+        {
+            _logger = logger;
         }
 
         public Func<TcpClient, CancellationToken, Task> Create(string name, RequestDelegate stack)
         {
             if (name?.Equals("videojet", StringComparison.OrdinalIgnoreCase) == true)
             {
-                return ActivatorUtilities.CreateInstance<VideojetProtocol>(_services, stack).ProcessAsync;
+                return new VideojetProtocol(stack, _logger).ProcessAsync;
             }
             else if (name?.Equals("sc500", StringComparison.OrdinalIgnoreCase) == true)
             {
-                return ActivatorUtilities.CreateInstance<Sc500Protocol>(_services, stack).ProcessAsync;
+                return new Sc500Protocol(stack, _logger).ProcessAsync;
             }
             else
             {
-                return ActivatorUtilities.CreateInstance<DefaultProtocol>(_services, stack).ProcessAsync;
+                return new DefaultProtocol(stack, _logger).ProcessAsync;
             }
         }
     }

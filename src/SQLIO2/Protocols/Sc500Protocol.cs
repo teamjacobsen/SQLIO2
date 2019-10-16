@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Buffers;
 using System.Net.Sockets;
@@ -12,15 +11,13 @@ namespace SQLIO2.Protocols
     class Sc500Protocol : ProtocolBase
     {
         private readonly RequestDelegate _stack;
-        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly ILogger _logger;
         private static readonly byte[] StartBytes = Encoding.UTF8.GetBytes("<msg");
         private static readonly byte[] EndBytes = Encoding.UTF8.GetBytes("</msg>");
 
-        public Sc500Protocol(RequestDelegate stack, IServiceScopeFactory serviceScopeFactory, ILogger<Sc500Protocol> logger) : base(logger)
+        public Sc500Protocol(RequestDelegate stack, ILogger logger) : base(logger)
         {
             _stack = stack;
-            _serviceScopeFactory = serviceScopeFactory;
             _logger = logger;
         }
 
@@ -65,14 +62,11 @@ namespace SQLIO2.Protocols
             {
                 try
                 {
-                    using (var scope = _serviceScopeFactory.CreateScope())
-                    {
-                        var packet = new Packet(scope.ServiceProvider, client, raw, xml);
+                    var packet = new Packet(client, raw, xml);
 
-                        _logger.LogInformation("Handling packet {Xml} from {RemoteEndpoint}", xml.OuterXml, client.Client.RemoteEndPoint);
+                    _logger.LogInformation("Handling packet {Xml} from {RemoteEndpoint}", xml.OuterXml, client.Client.RemoteEndPoint);
 
-                        await _stack(packet);
-                    }
+                    await _stack(packet);
                 }
                 catch (Exception e)
                 {

@@ -39,6 +39,8 @@ namespace SQLIO2.Middlewares
             bool handled;
             try
             {
+                _logger.LogInformation("Handling packet for SQL Server");
+
                 if (packet.Xml is object)
                 {
                     handled = await HandleXmlAsync(connection, packet);

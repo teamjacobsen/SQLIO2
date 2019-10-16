@@ -15,8 +15,8 @@ namespace SQLIO2.Protocols
             0x15
         };
 
-        public VideojetProtocol(RequestDelegate next, IServiceScopeFactory serviceScopeFactory, ILogger<VideojetProtocol> logger)
-            : base(next, serviceScopeFactory, logger)
+        public VideojetProtocol(RequestDelegate next, ILogger logger)
+            : base(next, logger)
         {
         }
 
