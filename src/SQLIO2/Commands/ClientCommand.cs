@@ -93,29 +93,27 @@ namespace SQLIO2
 
                     logger.LogInformation("Connected in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
 
+                    TaskCompletionSource<Packet> replyTcs = null;
+
+                    if (TimeoutMs != null)
+                    {
+                        var protocolFactory = new ProtocolFactory(logger);
+                        var protocol = protocolFactory.Create(ProtocolName, packet =>
+                        {
+                            replyTcs.SetResult(packet);
+
+                            return Task.CompletedTask;
+                        });
+
+                        _ = Task.Run(() => protocol(client, default));
+                    }
+
                     var timeouts = 0;
                     for (var sent = 0; sent < Count || Count == -1; sent++)
                     {
                         if (sent > 0)
                         {
                             await Task.Delay(TimeSpan.FromMilliseconds(Interval));
-                        }
-
-                        TaskCompletionSource<Packet> tcs = null;
-
-                        if (TimeoutMs != null)
-                        {
-                            tcs = new TaskCompletionSource<Packet>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-                            var protocolFactory = new ProtocolFactory(logger);
-                            var protocol = protocolFactory.Create(ProtocolName, packet =>
-                            {
-                                tcs.SetResult(packet);
-
-                                return Task.CompletedTask;
-                            });
-
-                            _ = Task.Run(() => protocol(client, default));
                         }
 
                         stopwatch.Restart();
@@ -138,15 +136,17 @@ namespace SQLIO2
 
                         if (TimeoutMs != null)
                         {
+                            replyTcs = new TaskCompletionSource<Packet>(TaskCreationOptions.RunContinuationsAsynchronously);
+
                             stopwatch.Restart();
 
-                            await Task.WhenAny(tcs.Task, Task.Delay(TimeoutMs.Value));
+                            await Task.WhenAny(replyTcs.Task, Task.Delay(TimeoutMs.Value));
 
-                            if (tcs.Task.IsCompleted)
+                            if (replyTcs.Task.IsCompleted)
                             {
                                 logger.LogInformation("Got reply after {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
 
-                                var replyTask = tcs.Task;
+                                var replyTask = replyTcs.Task;
                                 var reply = await replyTask;
 
                                 Console.WriteLine(reply.ToString());
