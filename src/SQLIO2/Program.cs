@@ -31,7 +31,7 @@ namespace SQLIO2
             var cmd = new TCommand();
             var properties = cmd.GetType().GetProperties();
 
-            var options = new Dictionary<string, PropertyInfo>();
+            var options = new Dictionary<string, PropertyInfo>(2 * properties.Length); // On average a short and a long form in a template
             var arguments = new SortedList<int, PropertyInfo>();
 
             foreach (var property in properties)
@@ -78,7 +78,14 @@ namespace SQLIO2
                 }
                 else if (options.TryGetValue(arg, out var property))
                 {
-                    currentOptionProperty = property;
+                    if (property.PropertyType == typeof(bool))
+                    {
+                        property.SetValue(cmd, true);
+                    }
+                    else
+                    {
+                        currentOptionProperty = property;
+                    }
                 }
                 else if (nextArgumentIndex < arguments.Count)
                 {
