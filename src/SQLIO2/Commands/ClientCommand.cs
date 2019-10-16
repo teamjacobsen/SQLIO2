@@ -38,6 +38,12 @@ namespace SQLIO2
         [Option("-v|--verbose")]
         public bool Verbose { get; set; }
 
+        [Option("-n|--count")]
+        public int Count { get; set; } = 1;
+
+        [Option("-i|--interval")]
+        public int Interval { get; set; }
+
         public async Task<int> HandleAsync()
         {
             var elapsedOnEntering = Program.Started.ElapsedMilliseconds;
@@ -83,66 +89,78 @@ namespace SQLIO2
                         await client.ConnectAsync(IPAddress.Loopback, Port);
                     }
 
+                    var clientStream = client.GetStream();
+
                     logger.LogInformation("Connected in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
 
-                    TaskCompletionSource<Packet> tcs = null;
-
-                    if (TimeoutMs != null)
+                    for (var sent = 0; sent < Count || Count == -1; sent++)
                     {
-                        tcs = new TaskCompletionSource<Packet>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-                        var protocolFactory = new ProtocolFactory(logger);
-                        var protocol = protocolFactory.Create(ProtocolName, packet =>
+                        if (sent > 0)
                         {
-                            tcs.SetResult(packet);
+                            await Task.Delay(TimeSpan.FromMilliseconds(Interval));
+                        }
 
-                            return Task.CompletedTask;
-                        });
+                        TaskCompletionSource<Packet> tcs = null;
 
-                        _ = Task.Run(() => protocol(client, default));
-                    }
-
-                    stopwatch.Restart();
-
-                    var stream = client.GetStream();
-
-                    if (Filename is object)
-                    {
-                        using var file = File.OpenRead(Filename);
-                        await file.CopyToAsync(stream);
-                        await stream.FlushAsync();
-                    }
-                    else
-                    {
-                        var data = GetDataBytes();
-
-                        await stream.WriteAsync(data);
-                        await stream.FlushAsync();
-                    }
-
-                    logger.LogInformation("Sent in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
-
-                    stopwatch.Restart();
-
-                    if (TimeoutMs != null)
-                    {
-                        await Task.WhenAny(tcs.Task, Task.Delay(TimeoutMs.Value));
-
-                        if (tcs.Task.IsCompleted)
+                        if (TimeoutMs != null)
                         {
-                            logger.LogInformation("Got reply after {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+                            tcs = new TaskCompletionSource<Packet>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-                            var replyTask = tcs.Task;
-                            var reply = await replyTask;
+                            var protocolFactory = new ProtocolFactory(logger);
+                            var protocol = protocolFactory.Create(ProtocolName, packet =>
+                            {
+                                tcs.SetResult(packet);
 
-                            Console.WriteLine(reply.ToString());
+                                return Task.CompletedTask;
+                            });
+
+                            _ = Task.Run(() => protocol(client, default));
+                        }
+
+                        stopwatch.Restart();
+
+                        if (Filename is object)
+                        {
+                            using var file = File.OpenRead(Filename);
+                            await file.CopyToAsync(clientStream);
+                            await clientStream.FlushAsync();
                         }
                         else
                         {
-                            logger.LogWarning("No reply received");
-                            return 1;
+                            var data = GetDataBytes();
+
+                            await clientStream.WriteAsync(data);
+                            await clientStream.FlushAsync();
+                        }
+
+                        logger.LogInformation("Sent in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+
+                        if (TimeoutMs != null)
+                        {
+                            stopwatch.Restart();
+
+                            await Task.WhenAny(tcs.Task, Task.Delay(TimeoutMs.Value));
+
+                            if (tcs.Task.IsCompleted)
+                            {
+                                logger.LogInformation("Got reply after {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
+
+                                var replyTask = tcs.Task;
+                                var reply = await replyTask;
+
+                                Console.WriteLine(reply.ToString());
+                            }
+                            else
+                            {
+                                throw new TimeoutException();
+                            }
                         }
                     }
+                }
+                catch (TimeoutException)
+                {
+                    logger.LogError("No reply received");
+                    return 1;
                 }
                 catch (SocketException e) when (e.SocketErrorCode == SocketError.ConnectionRefused)
                 {
