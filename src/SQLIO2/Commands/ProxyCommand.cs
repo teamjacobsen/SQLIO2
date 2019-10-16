@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using SQLIO2.Middlewares;
 using SQLIO2.Protocols;
 using SQLIO2.ProxyServices;
+using System;
 using System.Threading.Tasks;
 
 namespace SQLIO2
@@ -40,6 +41,7 @@ namespace SQLIO2
                 .ConfigureServices((hostContext, services) =>
                 {
                     services
+                        .Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(20))
                         .Replace(ServiceDescriptor.Singleton(typeof(ILogger<>), typeof(TimedLogger<>)))
                         .AddSingleton<ProtocolFactory>()
                         .Configure<SqlServerOptions>(hostContext.Configuration.GetSection("SqlServer"))
