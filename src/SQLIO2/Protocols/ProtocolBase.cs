@@ -19,6 +19,7 @@ namespace SQLIO2.Protocols
 
         public Task ProcessAsync(TcpClient client, CancellationToken cancellationToken)
         {
+            // See https://docs.microsoft.com/en-us/dotnet/standard/io/pipelines
             var pipe = new Pipe();
             var writingTask = FillPipeAsync(client.Client, pipe.Writer, cancellationToken);
             var readingTask = ReadPipeAsync(client, pipe.Reader, cancellationToken);
@@ -64,7 +65,7 @@ namespace SQLIO2.Protocols
             }
 
             // Tell the PipeReader that there's no more data coming
-            writer.Complete();
+            await writer.CompleteAsync();
 
             _logger.LogInformation("Client {RemoteEndpoint} was disconnected", socket.RemoteEndPoint);
         }
@@ -75,19 +76,20 @@ namespace SQLIO2.Protocols
             {
                 var result = await reader.ReadAsync(cancellationToken);
                 var buffer = result.Buffer;
-                var position = Read(client, buffer);
+                
+                Read(client, ref buffer);
+
+                reader.AdvanceTo(buffer.Start, buffer.End);
 
                 if (result.IsCompleted)
                 {
                     break;
                 }
-
-                reader.AdvanceTo(position, buffer.End);
             }
 
-            reader.Complete();
+            await reader.CompleteAsync();
         }
 
-        protected abstract SequencePosition Read(TcpClient client, in ReadOnlySequence<byte> sequence);
+        protected abstract void Read(TcpClient client, ref ReadOnlySequence<byte> buffer);
     }
 }

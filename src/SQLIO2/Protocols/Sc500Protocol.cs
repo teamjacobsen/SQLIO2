@@ -21,23 +21,32 @@ namespace SQLIO2.Protocols
             _logger = logger;
         }
 
-        protected override SequencePosition Read(TcpClient client, in ReadOnlySequence<byte> sequence)
+        protected override void Read(TcpClient client, ref ReadOnlySequence<byte> buffer)
         {
-            var reader = new SequenceReader<byte>(sequence);
+            while (TryReadMessage(ref buffer, out var message))
+            {
+                ProcessXml(client, message);
+            }
+        }
 
-            while (reader.TryReadTo(out ReadOnlySequence<byte> untilEndBytes, EndBytes, advancePastDelimiter: true))
+        private bool TryReadMessage(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> message)
+        {
+            var reader = new SequenceReader<byte>(buffer);
+
+            if (reader.TryReadTo(out ReadOnlySequence<byte> untilEndBytes, EndBytes, advancePastDelimiter: true))
             {
                 var untilStartReader = new SequenceReader<byte>(untilEndBytes);
 
                 if (untilStartReader.TryReadTo(out var _, StartBytes, advancePastDelimiter: false))
                 {
-                    var xmlBytesWithEndBytes = reader.Sequence.Slice(untilStartReader.Position, untilStartReader.Remaining + EndBytes.Length);
-
-                    ProcessXml(client, xmlBytesWithEndBytes);
+                    message = reader.Sequence.Slice(untilStartReader.Position, untilStartReader.Remaining + EndBytes.Length);
+                    buffer = buffer.Slice(reader.Position);
+                    return true;
                 }
             }
 
-            return reader.Position;
+            message = default;
+            return false;
         }
 
         private void ProcessXml(TcpClient client, ReadOnlySequence<byte> xml)

@@ -42,7 +42,7 @@ namespace SQLIO2
         public int Count { get; set; } = 1;
 
         [Option("-i|--interval")]
-        public int Interval { get; set; }
+        public int Interval { get; set; } = 1000;
 
         public async Task<int> HandleAsync()
         {
@@ -93,6 +93,7 @@ namespace SQLIO2
 
                     logger.LogInformation("Connected in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
 
+                    var timeouts = 0;
                     for (var sent = 0; sent < Count || Count == -1; sent++)
                     {
                         if (sent > 0)
@@ -152,15 +153,16 @@ namespace SQLIO2
                             }
                             else
                             {
-                                throw new TimeoutException();
+                                logger.LogError("No reply received");
+                                timeouts++;
                             }
                         }
                     }
-                }
-                catch (TimeoutException)
-                {
-                    logger.LogError("No reply received");
-                    return 1;
+
+                    if (timeouts > 0)
+                    {
+                        return 1;
+                    }
                 }
                 catch (SocketException e) when (e.SocketErrorCode == SocketError.ConnectionRefused)
                 {
