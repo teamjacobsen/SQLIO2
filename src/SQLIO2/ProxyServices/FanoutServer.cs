@@ -16,7 +16,6 @@ namespace SQLIO2.ProxyServices
         private readonly FanoutHub _fanoutHub;
         private readonly ProxyOptions _options;
         private readonly ILogger<FanoutServer> _logger;
-        private TcpListener _listener;
 
         public FanoutServer(FanoutHub fanoutHub, IOptions<ProxyOptions> options, ILogger<FanoutServer> logger)
         {
@@ -25,31 +24,28 @@ namespace SQLIO2.ProxyServices
             _logger = logger;
         }
 
-        public override Task StartAsync(CancellationToken cancellationToken)
-        {
-            _listener = new TcpListener(new IPEndPoint(IPAddress.Loopback, _options.FanoutPort));
-            _listener.Start();
-
-            _logger.LogInformation("Listening for fanout on {LocalEndpoint}", _listener.LocalEndpoint);
-
-            return base.StartAsync(cancellationToken);
-        }
-
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            stoppingToken.Register(() => _listener.Stop());
+            var listener = new TcpListener(new IPEndPoint(IPAddress.Loopback, _options.FanoutPort));
+            listener.Start();
+            stoppingToken.Register(() => listener.Stop());
+            
+            _logger.LogInformation("Listening for fanout on {LocalEndpoint}", listener.LocalEndpoint);
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    var client = await Task.Run(_listener.AcceptTcpClientAsync, stoppingToken);
+                    var client = await Task.Run(listener.AcceptTcpClientAsync, stoppingToken);
 
                     _logger.LogInformation("Accepting fanout client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
-                    _ = Task.Run(() => AcceptAsync(client, stoppingToken), stoppingToken);
+                    _ = Task.Run(() => AcceptAsync(client, stoppingToken));
                 }
                 catch (ObjectDisposedException) when (stoppingToken.IsCancellationRequested)
+                {
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
                 }
             }
@@ -82,7 +78,7 @@ namespace SQLIO2.ProxyServices
                 }
                 catch (IOException e) when (e.InnerException is SocketException se && se.SocketErrorCode == SocketError.ConnectionReset)
                 {
-                    // Client disconnected
+                    // Client disconnected abruptly
                     break;
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

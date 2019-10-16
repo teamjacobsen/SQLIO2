@@ -17,7 +17,6 @@ namespace SQLIO2.ProxyServices
         private readonly ProxyOptions _options;
         private readonly ILogger<DeviceServer> _logger;
         private readonly Func<TcpClient, CancellationToken, Task> _protocol;
-        private TcpListener _listener;
 
         public DeviceServer(ProtocolFactory protocolFactory, IServiceProvider services, FanoutHub fanoutHub, IOptions<ProxyOptions> options, IOptions<SqlServerOptions> sqlOptions, ILogger<DeviceServer> logger)
         {
@@ -37,29 +36,23 @@ namespace SQLIO2.ProxyServices
             _protocol = protocolFactory.Create(_options.ProtocolName, stack);
         }
 
-        public override Task StartAsync(CancellationToken cancellationToken)
-        {
-            _listener = new TcpListener(new IPEndPoint(IPAddress.Any, _options.ListenPort));
-            _listener.Start();
-
-            _logger.LogInformation("Listening for device on {LocalEndpoint}", _listener.LocalEndpoint);
-
-            return base.StartAsync(cancellationToken);
-        }
-
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            stoppingToken.Register(() => _listener.Stop());
+            var listener = new TcpListener(new IPEndPoint(IPAddress.Any, _options.ListenPort));
+            listener.Start();
+            stoppingToken.Register(() => listener.Stop());
+
+            _logger.LogInformation("Listening for device on {LocalEndpoint}", listener.LocalEndpoint);
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    var client = await Task.Run(_listener.AcceptTcpClientAsync, stoppingToken);
+                    var client = await Task.Run(listener.AcceptTcpClientAsync, stoppingToken);
 
                     _logger.LogInformation("Accepting device client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
-                    _ = Task.Run(() => AcceptAsync(client, stoppingToken), stoppingToken);
+                    _ = Task.Run(() => AcceptAsync(client, stoppingToken));
                 }
                 catch (ObjectDisposedException) when (stoppingToken.IsCancellationRequested)
                 {

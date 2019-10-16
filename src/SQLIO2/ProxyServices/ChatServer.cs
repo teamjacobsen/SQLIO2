@@ -16,7 +16,6 @@ namespace SQLIO2.ProxyServices
         private readonly ChatHub _chatHub;
         private readonly ProxyOptions _options;
         private readonly ILogger<ChatServer> _logger;
-        private TcpListener _listener;
 
         public ChatServer(ChatHub chatHub, IOptions<ProxyOptions> options, ILogger<ChatServer> logger)
         {
@@ -25,25 +24,19 @@ namespace SQLIO2.ProxyServices
             _logger = logger;
         }
 
-        public override Task StartAsync(CancellationToken cancellationToken)
-        {
-            _listener = new TcpListener(new IPEndPoint(IPAddress.Loopback, _options.ChatPort));
-            _listener.Start();
-
-            _logger.LogInformation("Listening for chat on {LocalEndpoint}", _listener.LocalEndpoint);
-
-            return base.StartAsync(cancellationToken);
-        }
-
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            stoppingToken.Register(() => _listener.Stop());
+            var listener = new TcpListener(new IPEndPoint(IPAddress.Loopback, _options.ChatPort));
+            listener.Start();
+            stoppingToken.Register(() => listener.Stop());
+
+            _logger.LogInformation("Listening for chat on {LocalEndpoint}", listener.LocalEndpoint);
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    var client = await Task.Run(_listener.AcceptTcpClientAsync, stoppingToken);
+                    var client = await Task.Run(listener.AcceptTcpClientAsync, stoppingToken);
 
                     _logger.LogInformation("Accepting chat client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
@@ -95,11 +88,8 @@ namespace SQLIO2.ProxyServices
                 }
                 catch (IOException e) when (e.InnerException is SocketException se && se.SocketErrorCode == SocketError.ConnectionReset)
                 {
-                    // Client disconnected
+                    // Client disconnected abruptly
                     break;
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
                 }
             }
 
