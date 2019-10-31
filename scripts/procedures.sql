@@ -1,7 +1,7 @@
 CREATE PROCEDURE [dbo].SQLIO_IncomingPacket
-@LocalHost nvarchar(20),
+@LocalHost nvarchar(256),
 @LocalPort int,
-@RemoteHost nvarchar(20),
+@RemoteHost nvarchar(256),
 @RemotePort int,
 @Request varbinary(2048),
 @Reply varbinary(2048) OUTPUT
@@ -13,9 +13,9 @@ END
 GO
 
 CREATE PROCEDURE [dbo].SQLIO_IncomingXML
-@LocalHost nvarchar(20),
+@LocalHost nvarchar(256),
 @LocalPort int,
-@RemoteHost nvarchar(20),
+@RemoteHost nvarchar(256),
 @RemotePort int,
 @Request xml,
 @Reply xml OUTPUT
