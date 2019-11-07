@@ -89,7 +89,7 @@ namespace SQLIO2
                         await client.ConnectAsync(IPAddress.Loopback, Port);
                     }
 
-                    var clientStream = client.GetStream();
+                    var clientStream = client.GetStream(); // Dispose on the client disposes the stream
 
                     logger.LogInformation("Connected in {ElapsedMilliseconds}ms", stopwatch.ElapsedMilliseconds);
 

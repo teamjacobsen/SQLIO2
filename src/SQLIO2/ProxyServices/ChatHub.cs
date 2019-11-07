@@ -12,12 +12,33 @@ namespace SQLIO2.ProxyServices
     {
         private readonly ILogger<ChatHub> _logger;
 
+        /// <summary>
+        /// The current chat client. The hub does not own the client, and it may even be disposed when we use it.
+        /// </summary>
         public TcpClient ChatClient { get; set; }
+
+        /// <summary>
+        /// The current remote client. The hub does not own the client, and it may even be disposed when we use it.
+        /// </summary>
         public TcpClient RemoteClient { get; set; }
 
         public ChatHub(ILogger<ChatHub> logger)
         {
             _logger = logger;
+        }
+
+        public bool TryRemoveChatClient(TcpClient client)
+        {
+            lock (this)
+            {
+                if (ChatClient == client)
+                {
+                    ChatClient = null;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public async Task<bool> TryWriteChatAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
@@ -27,21 +48,33 @@ namespace SQLIO2.ProxyServices
             if (client is null)
             {
                 _logger.LogWarning("There is no chat client");
+
+                return false;
             }
             else if (!await TryWriteAsync(client, data, cancellationToken))
             {
-                lock (this)
-                {
-                    if (ChatClient == client)
-                    {
-                        ChatClient = null;
-                    }
-                }
+                _logger.LogError("Failed to write to chat client");
+
+                TryRemoveChatClient(client);
 
                 return false;
             }
 
             return true;
+        }
+
+        public bool TryRemoveRemoteClient(TcpClient client)
+        {
+            lock (this)
+            {
+                if (RemoteClient == client)
+                {
+                    RemoteClient = null;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public async Task<bool> TryWriteRemoteAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
@@ -51,16 +84,14 @@ namespace SQLIO2.ProxyServices
             if (client is null)
             {
                 _logger.LogWarning("There is no remote client");
+
+                return false;
             }
             else if (!await TryWriteAsync(client, data, cancellationToken))
             {
-                lock (this)
-                {
-                    if (RemoteClient == client)
-                    {
-                        RemoteClient = null;
-                    }
-                }
+                _logger.LogError("Failed to write to remote client");
+
+                TryRemoveRemoteClient(client);
 
                 return false;
             }
@@ -78,7 +109,7 @@ namespace SQLIO2.ProxyServices
 
             try
             {
-                var stream = client.GetStream();
+                var stream = client.GetStream(); // Dispose on the client disposes the stream
 
                 _logger.LogInformation("Writing {DataAscii} to {RemoteEndpoint}", Encoding.ASCII.GetString(data.Span).Replace("\r", "\\r").Replace("\n", "\\n"), client.Client.RemoteEndPoint);
 
@@ -99,6 +130,7 @@ namespace SQLIO2.ProxyServices
             }
             catch (ObjectDisposedException)
             {
+                _logger.LogWarning("Object was disposed");
                 return false;
             }
         }

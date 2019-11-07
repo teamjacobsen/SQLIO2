@@ -52,44 +52,54 @@ namespace SQLIO2.ProxyServices
 
         private async Task AcceptAsync(TcpClient client, CancellationToken cancellationToken)
         {
-            _chatHub.ChatClient = client;
-
-            using var stream = client.GetStream();
-            var reader = PipeReader.Create(stream);
-
-            _logger.LogInformation("Waiting for chat client to send data");
-
-            while (!cancellationToken.IsCancellationRequested)
+            using (client)
             {
-                try
-                {
-                    var result = await reader.ReadAsync(cancellationToken);
+                _chatHub.ChatClient = client;
 
-                    if (result.IsCompleted || result.Buffer.IsEmpty)
+                var stream = client.GetStream(); // Dispose on the client disposes the stream
+                var reader = PipeReader.Create(stream);
+
+                _logger.LogInformation("Waiting for chat client to send data");
+
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    try
                     {
+                        var result = await reader.ReadAsync(cancellationToken);
+
+                        if (result.IsCompleted || result.Buffer.IsEmpty)
+                        {
+                            break;
+                        }
+
+                        _logger.LogDebug("Received {BufferLength} bytes", result.Buffer.Length);
+
+                        foreach (var segment in result.Buffer)
+                        {
+                            if (!await _chatHub.TryWriteRemoteAsync(segment, cancellationToken))
+                            {
+                                _logger.LogWarning("Unable to forward {SegmentLength} bytes", segment.Length);
+                            }
+                        }
+
+                        reader.AdvanceTo(result.Buffer.End);
+                    }
+                    catch (IOException e) when (e.InnerException is SocketException se && se.SocketErrorCode == SocketError.ConnectionReset)
+                    {
+                        _logger.LogError(e, "Client disconnected abruptly");
                         break;
                     }
-
-                    _logger.LogDebug("Received {BufferLength} bytes", result.Buffer.Length);
-
-                    foreach (var segment in result.Buffer)
+                    catch (Exception e)
                     {
-                        if (!await _chatHub.TryWriteRemoteAsync(segment, cancellationToken))
-                        {
-                            _logger.LogWarning("Unable to forward {SegmentLength} bytes", segment.Length);
-                        }
+                        _logger.LogError(e, "Unknown error");
+                        break;
                     }
+                }
 
-                    reader.AdvanceTo(result.Buffer.End);
-                }
-                catch (IOException e) when (e.InnerException is SocketException se && se.SocketErrorCode == SocketError.ConnectionReset)
-                {
-                    // Client disconnected abruptly
-                    break;
-                }
+                _chatHub.TryRemoveChatClient(client);
+
+                _logger.LogInformation("Chat client {RemoteEndpoint} was disconnected", client.Client.RemoteEndPoint);
             }
-
-            _logger.LogInformation("Chat client {RemoteEndpoint} was disconnected", client.Client.RemoteEndPoint);
         }
     }
 }

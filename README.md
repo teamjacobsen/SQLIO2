@@ -1,5 +1,5 @@
 # Build
-Run `dotnet publish -c Release -r win-x64` to publish a self contained exe.
+Run `dotnet publish -c Release` to publish.
 
 # Run
 ## Scanner

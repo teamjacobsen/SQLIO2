@@ -2,7 +2,7 @@
   "profiles": {
     "SQLIO2": {
       "commandName": "Project",
-      "commandLineArgs": "proxy -h localhost -p 2000 -c 2001 -r sc500"
+      "commandLineArgs": "client -h localhost -p 2001 -r sc500"
     }
   }
 }

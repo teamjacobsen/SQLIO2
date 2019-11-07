@@ -99,6 +99,8 @@ namespace SQLIO2.Middlewares
                 var msg = new XmlDocument();
                 msg.Load(reader);
 
+                _logger.LogInformation("Sending immediate {ReplyXmlLength} char reply", msg.OuterXml.Length);
+
                 var stream = packet.Client.GetStream();
 
                 await stream.WriteAsync(Encoding.UTF8.GetBytes(msg.OuterXml));
@@ -135,6 +137,8 @@ namespace SQLIO2.Middlewares
             if (!replyValue.IsNull)
             {
                 var reply = (byte[])replyParameter.Value;
+
+                _logger.LogInformation("Sending immediate {ReplyLength} byte reply", reply.Length);
 
                 var stream = packet.Client.GetStream();
 

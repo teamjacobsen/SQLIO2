@@ -36,6 +36,7 @@ namespace SQLIO2.ProxyServices
                 try
                 {
                     using var remoteClient = new TcpClient();
+                    var timeout = TimeSpan.Zero;
 
                     try
                     {
@@ -46,6 +47,7 @@ namespace SQLIO2.ProxyServices
                         _logger.LogInformation("Connected to device on {RemoteClientRemoteEndpoint}", remoteClient.Client.RemoteEndPoint);
 
                         _chatHub.RemoteClient = remoteClient;
+
                         var stack = CreateStack(stoppingToken);
                         var protocol = _protocolFactory.Create(_options.ProtocolName, stack);
                         await protocol(remoteClient, stoppingToken);
@@ -59,13 +61,34 @@ namespace SQLIO2.ProxyServices
                         _logger.LogWarning("Unable to connect to device server, retrying in one second");
 
                         // Retry in a second
-                        await Task.Delay(1000, stoppingToken);
+                        timeout = TimeSpan.FromMilliseconds(1000);
+                    }
+                    catch (SocketException e)
+                    {
+                        // Some other socket exception
+
+                        _logger.LogError(e, "Got exception while being connected to device");
+
+                        timeout = TimeSpan.FromMilliseconds(500);
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e, "Unknown error");
+
+                        timeout = TimeSpan.FromMilliseconds(500);
+                    }
+
+                    if (timeout > TimeSpan.Zero)
+                    {
+                        await Task.Delay(timeout, stoppingToken);
                     }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
                 }
             }
+
+            _logger.LogInformation("Exiting chat connection service");
         }
 
         private RequestDelegate CreateStack(CancellationToken cancellationToken)
@@ -86,7 +109,10 @@ namespace SQLIO2.ProxyServices
                 {
                     return async (packet) =>
                     {
-                        await _chatHub.TryWriteChatAsync(packet.Raw, cancellationToken);
+                        if (!await _chatHub.TryWriteChatAsync(packet.Raw, cancellationToken))
+                        {
+                            _logger.LogWarning("Unable to write {RawCount} bytes to chat client", packet.Raw.Length);
+                        }
                         await next(packet);
                     };
                 })

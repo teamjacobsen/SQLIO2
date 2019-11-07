@@ -61,14 +61,17 @@ namespace SQLIO2.ProxyServices
             _logger.LogInformation("Stopping device server");
         }
 
-        private Task AcceptAsync(TcpClient client, CancellationToken cancellationToken)
+        private async Task AcceptAsync(TcpClient client, CancellationToken cancellationToken)
         {
-            if (_fanoutHub.TryRegister(client))
+            using (client)
             {
-                _logger.LogInformation("Registered connected device {RemoteEndpoint} for fanout through proxy", client.Client.RemoteEndPoint);
-            }
+                if (_fanoutHub.TryRegister(client))
+                {
+                    _logger.LogInformation("Registered connected device {RemoteEndpoint} for fanout through proxy", client.Client.RemoteEndPoint);
+                }
 
-            return _protocol(client, cancellationToken);
+                await _protocol(client, cancellationToken);
+            }
         }
     }
 }
