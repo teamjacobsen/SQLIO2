@@ -72,24 +72,47 @@ namespace SQLIO2.Protocols
 
         private async Task ReadPipeAsync(TcpClient client, PipeReader reader, CancellationToken cancellationToken)
         {
-            while (true)
+            try
             {
-                var result = await reader.ReadAsync(cancellationToken);
-                var buffer = result.Buffer;
-                
-                Read(client, ref buffer);
-
-                reader.AdvanceTo(buffer.Start, buffer.End);
-
-                if (result.IsCompleted)
+                while (true)
                 {
-                    break;
+                    var result = await reader.ReadAsync(cancellationToken);
+                    var buffer = result.Buffer;
+
+                    try
+                    {
+                        // Process all messages from the buffer, modifying the input buffer on each iteration.
+                        while (TryParseMessage(ref buffer, out var message))
+                        {
+                            await ProcessMessageAsync(client, message);
+                        }
+
+                        if (result.IsCompleted)
+                        {
+                            if (buffer.Length > 0)
+                            {
+                                throw new InvalidOperationException("Incomplete message");
+                            }
+
+                            break;
+                        }
+                    }
+                    finally
+                    {
+                        reader.AdvanceTo(buffer.Start, buffer.End);
+                    }
                 }
             }
+            finally
+            {
+                await reader.CompleteAsync();
+            }
 
-            await reader.CompleteAsync();
+            _logger.LogInformation("There is no more data to read from {RemoteEndpoint}", client.Client.RemoteEndPoint);
         }
 
-        protected abstract void Read(TcpClient client, ref ReadOnlySequence<byte> buffer);
+        protected abstract bool TryParseMessage(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> message);
+
+        protected abstract Task ProcessMessageAsync(TcpClient client, ReadOnlySequence<byte> message);
     }
 }

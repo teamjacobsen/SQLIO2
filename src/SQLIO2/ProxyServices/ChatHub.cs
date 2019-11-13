@@ -51,7 +51,7 @@ namespace SQLIO2.ProxyServices
 
                 return false;
             }
-            else if (!await TryWriteAsync(client, data, cancellationToken))
+            else if (!await TryWriteAsync("Chat Client", client, data, cancellationToken))
             {
                 _logger.LogError("Failed to write to chat client");
 
@@ -87,7 +87,7 @@ namespace SQLIO2.ProxyServices
 
                 return false;
             }
-            else if (!await TryWriteAsync(client, data, cancellationToken))
+            else if (!await TryWriteAsync("Remote", client, data, cancellationToken))
             {
                 _logger.LogError("Failed to write to remote client");
 
@@ -99,11 +99,11 @@ namespace SQLIO2.ProxyServices
             return true;
         }
 
-        private async Task<bool> TryWriteAsync(TcpClient client, ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+        private async Task<bool> TryWriteAsync(string clientName, TcpClient client, ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
         {
             if (!client.Connected)
             {
-                _logger.LogWarning("Client is disconnected");
+                _logger.LogWarning("{ClientName} is disconnected", clientName);
                 return false;
             }
 
@@ -111,7 +111,7 @@ namespace SQLIO2.ProxyServices
             {
                 var stream = client.GetStream(); // Dispose on the client disposes the stream
 
-                _logger.LogInformation("Writing {DataAscii} to {RemoteEndpoint}", Encoding.ASCII.GetString(data.Span).Replace("\r", "\\r").Replace("\n", "\\n"), client.Client.RemoteEndPoint);
+                _logger.LogInformation("Writing {DataAscii} to {ClientName} ({RemoteEndpoint})", Encoding.ASCII.GetString(data.Span).Replace("\r", "\\r").Replace("\n", "\\n"), clientName, client.Client.RemoteEndPoint);
 
                 await stream.WriteAsync(data, cancellationToken);
                 await stream.FlushAsync(cancellationToken);

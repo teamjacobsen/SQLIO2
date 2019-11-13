@@ -39,8 +39,7 @@ namespace SQLIO2.ProxyServices
 
                     _logger.LogInformation("Accepting chat client {RemoteEndpoint} on {LocalEndpoint}", client.Client.RemoteEndPoint, client.Client.LocalEndPoint);
 
-                    // Only one chat client can be connected at a time
-                    await AcceptAsync(client, stoppingToken);
+                    _ = Task.Run(() => AcceptAsync(client, stoppingToken));
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -54,6 +53,7 @@ namespace SQLIO2.ProxyServices
         {
             using (client)
             {
+                // Only the most resent client will be stored at a time
                 _chatHub.ChatClient = client;
 
                 var stream = client.GetStream(); // Dispose on the client disposes the stream
@@ -96,9 +96,9 @@ namespace SQLIO2.ProxyServices
                     }
                 }
 
-                _chatHub.TryRemoveChatClient(client);
-
                 _logger.LogInformation("Chat client {RemoteEndpoint} was disconnected", client.Client.RemoteEndPoint);
+
+                _chatHub.TryRemoveChatClient(client);
             }
         }
     }

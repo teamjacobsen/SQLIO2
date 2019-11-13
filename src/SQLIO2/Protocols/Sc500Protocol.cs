@@ -21,15 +21,7 @@ namespace SQLIO2.Protocols
             _logger = logger;
         }
 
-        protected override void Read(TcpClient client, ref ReadOnlySequence<byte> buffer)
-        {
-            while (TryReadMessage(ref buffer, out var message))
-            {
-                ProcessXml(client, message);
-            }
-        }
-
-        private bool TryReadMessage(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> message)
+        protected override bool TryParseMessage(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> message)
         {
             var reader = new SequenceReader<byte>(buffer);
 
@@ -49,39 +41,17 @@ namespace SQLIO2.Protocols
             return false;
         }
 
-        private void ProcessXml(TcpClient client, ReadOnlySequence<byte> xml)
+        protected override async Task ProcessMessageAsync(TcpClient client, ReadOnlySequence<byte> message)
         {
-            var raw = xml.ToArray();
-            var msg = new XmlDocument();
-            try
-            {
-                msg.LoadXml(Encoding.UTF8.GetString(raw));
-            }
-            catch (XmlException)
-            {
-                _logger.LogError("Got invalid xml");
-                return;
-            }
-            RunStack(client, raw, msg);
-        }
+            var raw = message.ToArray();
+            var xml = new XmlDocument();
+            xml.LoadXml(Encoding.UTF8.GetString(raw));
 
-        protected void RunStack(TcpClient client, byte[] raw, XmlDocument xml)
-        {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var packet = new Packet(client, raw, xml);
+            var packet = new Packet(client, raw, xml);
 
-                    _logger.LogInformation("Handling packet {Xml} from {RemoteEndpoint}", xml.OuterXml, client.Client.RemoteEndPoint);
+            _logger.LogInformation("Handling sc500 protocol packet {Xml} from {RemoteEndpoint}", xml.OuterXml, client.Client.RemoteEndPoint);
 
-                    await _stack(packet);
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, "Unknown stack error while handling packet from {RemoteEndpoint}", client.Client.RemoteEndPoint);
-                }
-            });
+            await _stack(packet);
         }
     }
 }
